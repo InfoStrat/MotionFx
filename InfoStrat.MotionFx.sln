@@ -1,0 +1,77 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InfoStrat.MotionFx", "InfoStrat.MotionFx\InfoStrat.MotionFx.csproj", "{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{1AA48D5B-6A4B-4CA9-9CE7-6D548EA69D3E}"
+	ProjectSection(SolutionItems) = preProject
+		external\Blake.NUI.WPF.dll = external\Blake.NUI.WPF.dll
+		external\Blake.NUI.WPF.SurfaceToolkit.dll = external\Blake.NUI.WPF.SurfaceToolkit.dll
+		external\DirectCanvas.dll = external\DirectCanvas.dll
+		external\DirectShowLib-2005.dll = external\DirectShowLib-2005.dll
+		external\openNI.dll = external\openNI.dll
+		external\OpenNI.net.dll = external\OpenNI.net.dll
+		external\SlimDX.dll = external\SlimDX.dll
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Surface v1.5", "Surface v1.5", "{2BF1E910-550F-47ED-9242-50E1CB22C63B}"
+	ProjectSection(SolutionItems) = preProject
+		external\Surface v1.5\Microsoft.Surface.Presentation.dll = external\Surface v1.5\Microsoft.Surface.Presentation.dll
+		external\Surface v1.5\Microsoft.Surface.Presentation.Generic.dll = external\Surface v1.5\Microsoft.Surface.Presentation.Generic.dll
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HandTesting", "HandTesting\HandTesting.csproj", "{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "data", "data", "{E0B85321-2BF5-4861-9350-5E003C100557}"
+	ProjectSection(SolutionItems) = preProject
+		data\openni.xml = data\openni.xml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|Mixed Platforms = Release|Mixed Platforms
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|Any CPU.Build.0 = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|x86.ActiveCfg = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Debug|x86.Build.0 = Debug|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|Mixed Platforms.Build.0 = Release|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|x64.ActiveCfg = Release|Any CPU
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|x86.ActiveCfg = Release|x86
+		{531A5CAF-6FE7-4C9B-9DD9-B56143E139BA}.Release|x86.Build.0 = Release|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|Any CPU.Build.0 = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|x86.ActiveCfg = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Debug|x86.Build.0 = Debug|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|Mixed Platforms.Build.0 = Release|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|x64.ActiveCfg = Release|Any CPU
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|x86.ActiveCfg = Release|x86
+		{B0D7026A-FE0C-44D6-BCE8-BF45857727E7}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2BF1E910-550F-47ED-9242-50E1CB22C63B} = {1AA48D5B-6A4B-4CA9-9CE7-6D548EA69D3E}
+	EndGlobalSection
+EndGlobal

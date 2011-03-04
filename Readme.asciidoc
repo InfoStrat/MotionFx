@@ -1,0 +1,28 @@
+== InfoStrat Motion Framework
+http://www.infostrat.com
+
+Project lead: Joshua Blake <joshb@infostrat.com>
+
+=== Description
+
+The InfoStrat Motion Framework (MotionFx) lets you add motion tracking (Kinect, PrimeSensor) to your WPF 4 touch and Microsoft Surface applications.
+
+=== Requirements
+
+MotionFx requires:
+
+- Windows 7 (x86 or x64)
+- .NET 4
+- OpenNI > v1.0.0.25
+- NITE > v1.3.0.17
+- OpenNI compatible sensor and drivers (PrimeSensor and Sensor drivers, or Kinect and SensorKinect drivers)
+
+
+Compiling requires:
+- Visual Studio 2010 (C# minimum)
+
+=== Licensing
+
+This project is made available to you under the Apache v2 license.
+Please see the file APACHE20 for license details.
+
