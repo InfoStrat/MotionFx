@@ -26,17 +26,20 @@ namespace InfoStrat.MotionFx
         #endregion
 
         #region Class Fields
-        
+
         private IInputElement directlyOver = null;
 
         private Window rootWindow = null;
 
         private InputManager inputManager = InputManager.Current;
-        private Point lastPosition;
-
+        private Point currentPosition;
+        private bool currentPositionInBounds = false;
+        private bool lastEventInBounds = false;
         private HandPointEventArgs lastHandPointEventArgs = null;
         private bool lastEventPromoted = false;
         private MotionTrackingTouchDevice promotionTouchDevice = null;
+
+        private MotionTrackingScreen screen = null;
 
         #endregion
 
@@ -52,12 +55,15 @@ namespace InfoStrat.MotionFx
 
         #region Constructors
 
-        public MotionTrackingDevice(Window window) :
+        public MotionTrackingDevice(Window window, MotionTrackingScreen screen) :
             base()
         {
             if (window == null)
                 throw new ArgumentNullException("window");
+            if (screen == null)
+                throw new ArgumentNullException("screen");
 
+            this.screen = screen;
             this.rootWindow = window;
             _activeSource = PresentationSource.FromVisual(window);
 
@@ -94,7 +100,7 @@ namespace InfoStrat.MotionFx
                 this.ActiveSource != null &&
                 this.ActiveSource.RootVisual != null)
             {
-                return this.ActiveSource.RootVisual.TransformToDescendant((Visual)relativeTo).Transform(lastPosition);
+                return this.ActiveSource.RootVisual.TransformToDescendant((Visual)relativeTo).Transform(currentPosition);
             }
             return new Point();
         }
@@ -119,29 +125,63 @@ namespace InfoStrat.MotionFx
         internal void ReportMotionTrackingStarted(HandPointEventArgs e)
         {
             UpdateProperties(e);
-            var args = CreateEventArgs(MotionTracking.MotionTrackingStartedEvent);
-            
-            inputManager.ProcessInput(args);
+            if (!currentPositionInBounds)
+            {
+                return;
+            }
+            ProcessMotionTrackingStarted();
         }
 
         internal void ReportMotionTrackingUpdated(HandPointEventArgs e)
         {
             UpdateProperties(e);
-            var args = CreateEventArgs(MotionTracking.MotionTrackingUpdatedEvent);
-            inputManager.ProcessInput(args);
+            if (!currentPositionInBounds)
+            {
+                if (lastEventInBounds)
+                {
+                    ProcessMotionTrackingLost();
+                }
+                return;
+            }
+            if (!lastEventInBounds)
+            {
+                ProcessMotionTrackingStarted();
+            }
+            ProcessMotionTrackingUpdated();
         }
-
+        
         internal void ReportMotionTrackingLost(HandPointEventArgs e)
         {
             UpdateProperties(e);
-            var args = CreateEventArgs(MotionTracking.MotionTrackingLostEvent);
-            inputManager.ProcessInput(args);
+            if (!lastEventInBounds)
+            {
+                return;
+            }
+            ProcessMotionTrackingLost();
         }
 
         #endregion
 
         #region Private Methods
 
+        private void ProcessMotionTrackingStarted()
+        {
+            var args = CreateEventArgs(MotionTracking.MotionTrackingStartedEvent);
+            inputManager.ProcessInput(args);
+        }
+
+        private void ProcessMotionTrackingUpdated()
+        {
+            var args = CreateEventArgs(MotionTracking.MotionTrackingUpdatedEvent);
+            inputManager.ProcessInput(args);
+        }
+
+        private void ProcessMotionTrackingLost()
+        {
+            var args = CreateEventArgs(MotionTracking.MotionTrackingLostEvent);
+            inputManager.ProcessInput(args);
+        }
+        
         void HitTestInvalidatedAsync(object sender, EventArgs e)
         {
             UpdateDirectlyOver();
@@ -153,7 +193,6 @@ namespace InfoStrat.MotionFx
             if (input == null || input.Device != this)
                 return;
 
-            //if (input.Handled)
             if (!this.ShouldPromoteToTouch)
             {
                 if (lastEventPromoted)
@@ -161,7 +200,6 @@ namespace InfoStrat.MotionFx
                     PromoteToTouchUp();
                 }
                 lastEventPromoted = false;
-                this.Session.IsPromotedToTouch = false;
             }
             else
             {
@@ -174,7 +212,6 @@ namespace InfoStrat.MotionFx
                     PromoteToTouchMove();
                 }
                 lastEventPromoted = true;
-                this.Session.IsPromotedToTouch = true;
             }
         }
 
@@ -182,7 +219,7 @@ namespace InfoStrat.MotionFx
         {
             if (promotionTouchDevice == null)
             {
-                promotionTouchDevice = new MotionTrackingTouchDevice(lastHandPointEventArgs, rootWindow);
+                promotionTouchDevice = new MotionTrackingTouchDevice(lastHandPointEventArgs, rootWindow, screen);
             }
             promotionTouchDevice.TouchDown(lastHandPointEventArgs);
         }
@@ -214,8 +251,13 @@ namespace InfoStrat.MotionFx
             this.lastHandPointEventArgs = e;
             this.Session = e.Session;
             this.Id = e.Id;
-            lastPosition = MapPositionToScreen(e.Session);
-            UpdateDirectlyOver();
+            lastEventInBounds = currentPositionInBounds;
+            currentPositionInBounds = screen.IsSessionInBounds(e.Session);
+            if (currentPositionInBounds)
+            {
+                currentPosition = screen.MapPositionToScreen(e.Session);
+                UpdateDirectlyOver();
+            }
         }
 
         private MotionTrackingEventArgs CreateEventArgs(RoutedEvent routedEvent)
@@ -226,33 +268,19 @@ namespace InfoStrat.MotionFx
             return args;
         }
 
-        private bool UpdateDirectlyOver()
+        private void UpdateDirectlyOver()
         {
-            //IInputElement newDirectlyOver = null;
-
-            CriticalHitTest(lastPosition);
-
-            //if (newDirectlyOver != this.directlyOver)
-            //{
-            //    this.ChangeDirectlyOver(newDirectlyOver);
-            //    return true;
-            //}
-            return false;
-        }
-
-        private void ChangeDirectlyOver(IInputElement newDirectlyOver)
-        {
-            this.directlyOver = newDirectlyOver;
+            if (currentPositionInBounds)
+            {
+                CriticalHitTest(currentPosition);
+            }
         }
 
         private void CriticalHitTest(Point position)
         {
             VisualTreeHelper.HitTest(this.rootWindow, null, MyHitTestResult, new PointHitTestParameters(position));
-            //if (result == null)
-            //    return null;
-            //return result.VisualHit as IInputElement;
         }
-        
+
         public HitTestResultBehavior MyHitTestResult(HitTestResult result)
         {
             var element = result.VisualHit as UIElement;
@@ -261,15 +289,6 @@ namespace InfoStrat.MotionFx
 
             this.directlyOver = element;
             return HitTestResultBehavior.Stop;
-        }
-
-        private Point MapPositionToScreen(HandSession session)
-        {
-            Point3D position = session.PositionProjective;
-
-            double x = MathUtility.MapValue(position.X, 0, 640, 0, this.rootWindow.ActualWidth);
-            double y = MathUtility.MapValue(position.Y, 0, 480, 0, this.rootWindow.ActualHeight);
-            return new Point(x, y);
         }
 
         #endregion

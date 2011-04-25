@@ -36,10 +36,10 @@ namespace InfoStrat.MotionFx
 
         private double movementThreshold = 1;
         private double timeThreshold = 5;
-
-        private IInputElement directlyOver;
-
+        
         private Window rootWindow = null;
+
+        private MotionTrackingScreen screen = null;
 
         private InputManager inputManager = InputManager.Current;
 
@@ -53,14 +53,17 @@ namespace InfoStrat.MotionFx
 
         #region Constructors
 
-        public MotionTrackingTouchDevice(HandPointEventArgs e, Window window) :
+        public MotionTrackingTouchDevice(HandPointEventArgs e, Window window, MotionTrackingScreen screen) :
             base(e.Id)
         {
             lastEventArgs = e;
 
             if (window == null)
                 throw new ArgumentNullException("window");
+            if (screen == null)
+                throw new ArgumentNullException("screen");
 
+            this.screen = screen;
             this.rootWindow = window;
         }
 
@@ -78,14 +81,14 @@ namespace InfoStrat.MotionFx
 
             foreach (HandPointEventArgs e in intermediateEvents)
             {
-                Point point = MapPositionToScreen(e.Session);
+                Point point = screen.MapPositionToScreen(e.Session);
                 if (relativeTo != null)
                 {
                     point = this.ActiveSource.RootVisual.TransformToDescendant((Visual)relativeTo).Transform(point);
                 }
 
                 //Rect rect = e.BoundingRect;
-                Rect rect = new Rect(MapPositionToScreen(e.Session),
+                Rect rect = new Rect(screen.MapPositionToScreen(e.Session),
                                  new Size(1, 1));
 
                 TouchAction action = TouchAction.Move;
@@ -109,13 +112,13 @@ namespace InfoStrat.MotionFx
 
             if (lastEventArgs.Session != null)
             {
-                point = MapPositionToScreen(lastEventArgs.Session);
+                point = screen.MapPositionToScreen(lastEventArgs.Session);
                 if (relativeTo != null)
                 {
                     point = this.ActiveSource.RootVisual.TransformToDescendant((Visual)relativeTo).Transform(point);
                 }
 
-                rect = new Rect(MapPositionToScreen(lastEventArgs.Session),
+                rect = new Rect(screen.MapPositionToScreen(lastEventArgs.Session),
                                      new Size(1, 1));
             }
             TouchAction action = TouchAction.Move;
@@ -134,15 +137,6 @@ namespace InfoStrat.MotionFx
 
         #region Private Methods
         
-        private Point MapPositionToScreen(HandSession session)
-        {
-            Point3D position = session.PositionProjective;
-
-            double x = MathUtility.MapValue(position.X, 0, 640, 0, this.rootWindow.ActualWidth);
-            double y = MathUtility.MapValue(position.Y, 0, 480, 0, this.rootWindow.ActualHeight);
-            return new Point(x, y);
-        }
-
         internal void TouchDown(HandPointEventArgs e)
         {
             if (lastEventType != EventType.TouchMoveIntermediate)
@@ -151,7 +145,7 @@ namespace InfoStrat.MotionFx
             }
 
             this.lastEventArgs = e;
-            lastEventPosition = MapPositionToScreen(e.Session);
+            lastEventPosition = screen.MapPositionToScreen(e.Session);
             lastEventTime = DateTime.Now;
             lastEventType = EventType.TouchDown;
             this.Session = e.Session;
@@ -174,7 +168,7 @@ namespace InfoStrat.MotionFx
         private void CoalesceEvents(HandPointEventArgs e)
         {
             TimeSpan span = DateTime.Now - lastEventTime;
-            Vector delta = MapPositionToScreen(e.Session) - lastEventPosition;
+            Vector delta = screen.MapPositionToScreen(e.Session) - lastEventPosition;
 
             if (lastEventType != EventType.TouchMoveIntermediate)
             {
@@ -192,7 +186,7 @@ namespace InfoStrat.MotionFx
             {
                 //Debug.WriteLine("Event go: " + touch.TouchDevice.Id + " " + point.Position.ToString() + " " + touch.Timestamp.ToString());
 
-                lastEventPosition = MapPositionToScreen(e.Session);
+                lastEventPosition = screen.MapPositionToScreen(e.Session);
                 lastEventTime = DateTime.Now;
                 lastEventType = EventType.TouchMove;
 

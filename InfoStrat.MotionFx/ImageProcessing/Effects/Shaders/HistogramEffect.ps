@@ -1,0 +1,63 @@
+﻿//From http://mynameismjp.wordpress.com/2010/11/14/d3d11-features MS-PL
+Texture2D InputTexture : register(t0);
+
+SamplerState TextureSampler : register(s0);
+
+cbuffer psconstants0 : register(b0)
+{
+	float4 tint : packoffset(c0);
+};
+
+cbuffer PSConstants1 : register(b1)
+{
+	float MinThreshold : packoffset(c0);
+};
+
+cbuffer PSConstants2 : register(b2)
+{
+	float MaxThreshold : packoffset(c0);
+};
+
+struct PSInput
+{
+    float4 PositionCS : SV_Position;
+    float2 TexCoord : TEXCOORD;
+};
+
+float Unpack(float4 value)
+{
+	return value.b * 256 + value.g * 256 * 256;
+}
+
+bool IsCoordInThreshold(float2 coord)
+{
+	float4 sample = InputTexture.Sample(TextureSampler, coord);
+	float value = Unpack(sample);
+
+	if (value >= MinThreshold &&
+		value <= MaxThreshold)
+	{
+		return true;
+	}
+	return false;
+}
+
+// Performs a gaussian blur in one direction
+float4 ApplyThreshold(in PSInput input)
+{
+    float2 texCoord = input.TexCoord;
+	float4 color = float4(0, 0, 0, 0);
+	//float4 sample = InputTexture.Sample(TextureSampler, texCoord);
+	if (IsCoordInThreshold(texCoord))
+	{
+		color = tint;
+	}
+	
+    return color;
+	//return sample;
+}
+
+float4 ThresholdMain(in PSInput input) : SV_Target
+{
+	return ApplyThreshold(input);
+}

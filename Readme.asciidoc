@@ -13,10 +13,11 @@ MotionFx requires:
 
 - Windows 7 (x86 or x64)
 - .NET 4
-- OpenNI > v1.0.0.25
-- NITE > v1.3.0.17
-- OpenNI compatible sensor and drivers (PrimeSensor and Sensor drivers, or Kinect and SensorKinect drivers)
+- OpenNI >= v1.1.0.41
+- NITE >= v1.3.1.5
+- OpenNI compatible sensor and drivers (PrimeSensor and Sensor drivers, or Kinect and SensorKinect drivers) >= 5.0.1.32
 
+- Surface Toolkit for Windows Touch Beta (v1.5) http://bit.ly/gJlhqE (also works with Surface SDK 2.0)
 
 Compiling requires:
 - Visual Studio 2010 (C# minimum)

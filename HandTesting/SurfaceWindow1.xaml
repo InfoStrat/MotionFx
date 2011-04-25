@@ -3,6 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:s="http://schemas.microsoft.com/surface/2008"
                  xmlns:blake="clr-namespace:Blake.NUI.WPF;assembly=Blake.NUI.WPF"
+                 xmlns:blakesurf="clr-namespace:Blake.NUI.WPF.SurfaceToolkit;assembly=Blake.NUI.WPF.SurfaceToolkit"
                  xmlns:mc="clr-namespace:InfoStrat.MotionFx.Controls;assembly=InfoStrat.MotionFx"
                  xmlns:m="clr-namespace:InfoStrat.MotionFx;assembly=InfoStrat.MotionFx"
                  xmlns:filters="clr-namespace:InfoStrat.MotionFx.Filters;assembly=InfoStrat.MotionFx"
@@ -13,25 +14,15 @@
         <Style x:Key="ScatterViewItemStyle"
                TargetType="{x:Type s:ScatterViewItem}">
             <Setter Property="MinWidth"
-                    Value="{Binding Path=Content.MinWidth, RelativeSource={RelativeSource Self}, Mode=OneWay}" />
+                    Value="300" />
             <Setter Property="MinHeight"
-                    Value="{Binding Path=Content.MinHeight, RelativeSource={RelativeSource Self}, Mode=OneWay}" />
-            <Setter Property="MaxWidth"
-                    Value="{Binding Path=Content.MaxWidth, RelativeSource={RelativeSource Self}, Mode=OneWay}" />
-            <Setter Property="MaxHeight"
-                    Value="{Binding Path=Content.MaxHeight, RelativeSource={RelativeSource Self}, Mode=OneWay}" />
-            <Setter Property="Width"
-                    Value="{Binding Path=Content.Width, RelativeSource={RelativeSource Self}, Mode=TwoWay}" />
-            <Setter Property="Height"
-                    Value="{Binding Path=Content.Height, RelativeSource={RelativeSource Self}, Mode=TwoWay}" />
+                    Value="200" />
             <Setter Property="Center"
-                    Value="400,400" />
-            <Setter Property="Background"
-                    Value="{x:Null}" />
+                    Value="-600,-450" />
             <Setter Property="CanRotate"
                     Value="true" />
             <Setter Property="Orientation"
-                    Value="0.0" />
+                    Value="-30.0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type s:ScatterViewItem}">
@@ -58,6 +49,14 @@
                                 From="10,10,10,10"
                                 To="0,0,0,0" />
         </Storyboard>
+
+        <DataTemplate x:Key="SVITemplate">
+            <Viewbox Stretch="Uniform">
+                <Image Source="{Binding ImageSource}"
+                       Width="600"
+                       Height="450" />
+            </Viewbox>
+        </DataTemplate>
     </s:SurfaceWindow.Resources>
 
     <Grid Background="White">
@@ -65,13 +64,19 @@
             <blake:InputFilter.Filter>
                 <filters:PushMotionInputFilter />
             </blake:InputFilter.Filter>
-
-            <s:ScatterView ItemContainerStyle="{StaticResource ScatterViewItemStyle}">
+            <s:ScatterView Name="scatterview"
+                           ItemContainerStyle="{StaticResource ScatterViewItemStyle}"
+                           Background="{x:Null}"
+                           ItemsSource="{Binding Images}"
+                           ItemTemplate="{StaticResource SVITemplate}" />
+            <!--<blakesurf:DragDropScatterView ItemContainerStyle="{StaticResource ScatterViewItemStyle}"
+                                           Background="{x:Null}">
                 <s:ScatterViewItem x:Name="sviDesert"
                                    Center="-600,-450"
                                    Orientation="-30"
                                    MinWidth="300"
-                                   MinHeight="200">
+                                   MinHeight="200"
+                                   blakesurf:DragDropScatterView.AllowDrag="True">
                     <Image Source="Images\Desert.jpg"
                            Width="600"
                            Height="450"></Image>
@@ -81,7 +86,8 @@
                                    Center="-600,-450"
                                    Orientation="-30"
                                    MinWidth="300"
-                                   MinHeight="200">
+                                   MinHeight="200"
+                                   blakesurf:DragDropScatterView.AllowDrag="True">
                     <Image Source="Images\Jellyfish.jpg"
                            Width="600"
                            Height="450"></Image>
@@ -91,12 +97,13 @@
                                    Center="-600,-450"
                                    Orientation="-30"
                                    MinWidth="300"
-                                   MinHeight="200">
+                                   MinHeight="200"
+                                   blakesurf:DragDropScatterView.AllowDrag="True">
                     <Image Source="Images\Penguins.jpg"
                            Width="600"
                            Height="450"></Image>
                 </s:ScatterViewItem>
-            </s:ScatterView>
+            </blakesurf:DragDropScatterView>-->
         </Grid>
 
         <Grid HorizontalAlignment="Right"
@@ -113,6 +120,7 @@
                                              Unchecked="MotionToggleButtonDesert_Unchecked"
                                              HorizontalAlignment="Center"
                                              Margin="0,0,0,20"
+                                             Background="LightGray"
                                              Width="110"
                                              Height="80">
                     <TextBlock FontSize="16"
@@ -143,6 +151,7 @@
 
                 <controls:MotionButton x:Name="ButtonShutDown"
                                        Click="ButtonShutDown_Click"
+                                       Background="LightGray"
                                        Margin="0,50,0,0"
                                        Height="60"
                                        Width="80">
@@ -162,7 +171,9 @@
 
         <mc:DepthView HorizontalAlignment="Left"
                       VerticalAlignment="Top"
-                      IsHitTestVisible="False" />
-        <mc:HandVisualization IsHitTestVisible="False" />
+                      IsHitTestVisible="False"
+                      MotionTrackingClient="{Binding MotionTrackingClient}"/>
+        <mc:HandVisualization IsHitTestVisible="False"
+                              MotionTrackingClient="{Binding MotionTrackingClient}" />
     </Grid>
 </s:SurfaceWindow>

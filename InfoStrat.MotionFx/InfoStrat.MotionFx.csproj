@@ -84,8 +84,11 @@
     <Reference Include="DirectCanvas">
       <HintPath>..\external\DirectCanvas.dll</HintPath>
     </Reference>
-    <Reference Include="OpenNI.net, Version=1.0.0.25, Culture=neutral, processorArchitecture=x86">
-      <HintPath>..\external\OpenNI.net.dll</HintPath>
+    <Reference Include="Microsoft.Surface.Presentation, Version=1.5.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\external\Surface v1.5\Microsoft.Surface.Presentation.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenNI.Net, Version=1.1.0.41, Culture=neutral, PublicKeyToken=6b43d0c6cf74ee7f, processorArchitecture=x86">
+      <HintPath>..\external\OpenNI.Net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -102,11 +105,23 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Controls\DepthFrameViewer.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\DrawingLayerViewer.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Controls\DepthView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Controls\HandVisualization.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\RawDepthView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -118,28 +133,42 @@
   <ItemGroup>
     <Compile Include="BitHelper.cs" />
     <Compile Include="BitmapHelper.cs" />
-    <Compile Include="Bone.cs" />
+    <Compile Include="Controls\DrawingLayerViewer.cs" />
+    <Compile Include="Controls\DepthFrameViewer.cs" />
     <Compile Include="Controls\DepthView.xaml.cs">
       <DependentUpon>DepthView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\HandVisualization.xaml.cs">
       <DependentUpon>HandVisualization.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\RawDepthView.xaml.cs">
+      <DependentUpon>RawDepthView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="FastBitmap.cs" />
+    <Compile Include="Filters\ActiveScatterViewMotionInputFilter.cs" />
     <Compile Include="Filters\HoverInputFilter.cs" />
     <Compile Include="Filters\PushMotionRangeTouchFilter.cs" />
     <Compile Include="Filters\PushMotionInputFilter.cs" />
+    <Compile Include="FrameUpdatedEventHandler.cs" />
     <Compile Include="HandPointEventArgs.cs" />
     <Compile Include="HandPointGenerator.cs" />
     <Compile Include="HandSession.cs" />
+    <Compile Include="DepthFrame.cs" />
+    <Compile Include="ImageProcessing\Effects\ColorMapDepthEffect.cs" />
+    <Compile Include="ImageProcessing\Effects\UnpackDepthEffect.cs" />
+    <Compile Include="ImageProcessing\Effects\EdgeDetectEffect.cs" />
+    <Compile Include="ImageProcessing\Effects\HistogramEffect.cs" />
     <Compile Include="ImageProcessing\Effects\ThresholdEffect.cs" />
     <Compile Include="ImageProcessing\ImageProcessing.cs" />
     <Compile Include="MapUpdatedEventArgs.cs" />
+    <Compile Include="MotionTrackingClient.cs" />
     <Compile Include="MotionTrackingDevice.cs" />
     <Compile Include="MotionTracking.cs" />
     <Compile Include="MotionTrackingEventArgs.cs" />
     <Compile Include="MotionTrackingEventHandler.cs" />
+    <Compile Include="MotionTrackingScreen.cs" />
     <Compile Include="MotionTrackingTouchDevice.cs" />
+    <Compile Include="NativeInterop.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -153,12 +182,15 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="ReferenceFrame.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
     <EmbeddedResource Include="ImageProcessing\Effects\Shaders\ThresholdEffect.ps" />
+    <EmbeddedResource Include="ImageProcessing\Effects\Shaders\HistogramEffect.ps" />
+    <EmbeddedResource Include="ImageProcessing\Effects\Shaders\EdgeDetectEffect.ps" />
+    <EmbeddedResource Include="ImageProcessing\Effects\Shaders\UnpackDepthEffect.ps" />
+    <EmbeddedResource Include="ImageProcessing\Effects\Shaders\ColorMapDepthEffect.ps" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

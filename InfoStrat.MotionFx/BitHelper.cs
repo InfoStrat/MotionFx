@@ -7,7 +7,7 @@ namespace InfoStrat.MotionFx
 {
     public class MotionHelper
     {
-        internal static System.Windows.Media.Media3D.Point3D XnPoint3DToPoint3D(xn.Point3D point)
+        internal static System.Windows.Media.Media3D.Point3D XnPoint3DToPoint3D(OpenNI.Point3D point)
         {
             return new System.Windows.Media.Media3D.Point3D(point.X, point.Y, point.Z);
         }

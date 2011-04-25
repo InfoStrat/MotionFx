@@ -1,4 +1,4 @@
-﻿using System;
+﻿    using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,9 +14,10 @@ namespace InfoStrat.MotionFx
 {
     public enum HandPose
     {
-        Touching,
-        Hovering,
-        None
+        Pointing,
+        Fist,
+        Palm,
+        Unknown
     }
 
     public struct Point2D
@@ -285,40 +286,15 @@ namespace InfoStrat.MotionFx
 
         public int Id { get; set; }
 
-        internal xn.Point3D xnPosition { get; set; }
+        internal OpenNI.Point3D xnPosition { get; set; }
 
         public Point3D Position { get; set; }
         public Point3D ShoulderPosition { get; set; }
         public Point3D PositionProjective { get; set; }
 
-        public bool IsPromotedToTouch { get; set; }
-
-        #region Rect
-        
-        private Rect _rect;
-        public Rect Rect
-        {
-            get
-            {
-                return _rect;
-
-            }
-            set
-            {
-                if (_rect == value)
-                    return;
-
-                _rect = value;
-
-                ProcessRect();
-            }
-        }
-        
-        #endregion
-
         #region Pose
         
-        private HandPose _pose = HandPose.None;
+        private HandPose _pose = HandPose.Unknown;
         public HandPose Pose
         {
             get
@@ -335,56 +311,7 @@ namespace InfoStrat.MotionFx
         }
         
         #endregion
-
-        #region Circles
-
-        private List<PolarCoord> _circles;
-        public List<PolarCoord> Circles
-        {
-            get
-            {
-                if (_circles == null)
-                {
-                    _circles = new List<PolarCoord>();
-                }
-                return _circles;
-            }
-        }
-
-        #endregion
-
-        #region HandMap
-
-        public int XRes { get; private set; }
-        public int YRes { get; private set; }
-        public int BytesPerPixel { get; private set; }
-        public int Stride { get; private set; }
-        public int HandMapSize { get; private set; }
-        public PixelFormat HandMapFormat { get; private set; }
-        public byte[] HandMap { get; private set; }
-        public byte[] HandMapDepth { get; private set; }
-
-        #endregion
-
-        public List<PolarCoordCollection> Bins = new List<PolarCoordCollection>();
-
-        #region PolarPoints
-
-        private PolarCoordCollection _polarPoints;
-        public  PolarCoordCollection PolarPoints
-        {
-            get
-            {
-                if (_polarPoints == null)
-                {
-                    _polarPoints = new PolarCoordCollection();
-                }
-                return _polarPoints;
-            }
-        }
-
-        #endregion
-
+        
         #endregion
 
         #region Events
@@ -404,78 +331,16 @@ namespace InfoStrat.MotionFx
 
         public HandSession()
         {
-            InitMaps();
+            Pose = HandPose.Unknown;
         }
 
         #endregion
 
         #region Public Methods
 
-        public void GetHandMapBitmapSource(Dispatcher dispatcher, Action<BitmapSource> BitmapSourceCallback)
-        {
-            if (dispatcher == null)
-                throw new ArgumentNullException("dispatcher");
-
-            if (BitmapSourceCallback == null)
-                throw new ArgumentNullException("BitmapSourceCallback");
-
-            dispatcher.Invoke((Action)delegate
-            {
-                BitmapSource bitmap = BitmapSource.Create(XRes, YRes, 96, 96,
-                                                        HandMapFormat, null,
-                                                        this.HandMap, Stride);
-                BitmapSourceCallback(bitmap);
-            });
-        }
-        
-        public void GetHandMapDepthBitmapSource(Dispatcher dispatcher, Action<BitmapSource> BitmapSourceCallback)
-        {
-            if (dispatcher == null)
-                throw new ArgumentNullException("dispatcher");
-
-            if (BitmapSourceCallback == null)
-                throw new ArgumentNullException("BitmapSourceCallback");
-
-            dispatcher.Invoke((Action)delegate
-            {
-                BitmapSource bitmap = BitmapSource.Create(XRes, YRes, 96, 96,
-                                                        HandMapFormat, null,
-                                                        this.HandMapDepth, Stride);
-                BitmapSourceCallback(bitmap);
-            });
-        }
-
         #endregion
 
         #region Private Methods
-
-        private void InitMaps()
-        {
-            XRes = 200;
-            YRes = 200;
-            BytesPerPixel = 4;
-            Stride = XRes * BytesPerPixel;
-            HandMapSize = Stride * YRes;
-            HandMapFormat = PixelFormats.Bgra32;
-
-            HandMap = new byte[HandMapSize];
-            HandMapDepth = new byte[HandMapSize];
-        }
-
-        private void ProcessRect()
-        {
-            double maxLen = Math.Max(Rect.Width, Rect.Height);
-            double minLen = Math.Min(Rect.Width, Rect.Height);
-
-            //if (maxLen < 80)
-            //{
-            //    Pose = HandPose.Fist;
-            //}
-            //else
-            //{
-            //    Pose = HandPose.Palm;
-            //}
-        }
 
         #endregion
     }

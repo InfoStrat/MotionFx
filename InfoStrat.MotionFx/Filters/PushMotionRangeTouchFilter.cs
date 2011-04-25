@@ -154,7 +154,7 @@ namespace InfoStrat.MotionFx.Filters
         {
             MotionTracking.AddMotionTrackingStartedHandler(element, ProcessEvent);
             MotionTracking.AddMotionTrackingUpdatedHandler(element, ProcessEvent);
-            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEvent);
+            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
 
         protected override void UnregisterEvents(UIElement element)
@@ -164,9 +164,9 @@ namespace InfoStrat.MotionFx.Filters
             MotionTracking.RemoveMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
 
-        protected override bool IsDeviceValid(bool? wasValid, InputDevice device)
+        protected override bool IsDeviceValid(bool? wasValid, InputEventArgs args)
         {
-            var motion = device as MotionTrackingDevice;
+            var motion = args.Device as MotionTrackingDevice;
             if (motion == null)
                 return NotifyTransition(wasValid, motion, true);
             if (motion.Session == null)
@@ -192,13 +192,6 @@ namespace InfoStrat.MotionFx.Filters
             if (wasValid.HasValue &&
                 wasValid != isValid)
             {
-                //this.Dispatcher.BeginInvoke((Action)delegate
-                //    {
-                //        HandPointGenerator.ResetHandSession(device.Session);
-                //    },
-                //System.Windows.Threading.DispatcherPriority.Input);
-                //HandPointGenerator.ResetHandSession(device.Session);
-
             }
 
             return isValid;

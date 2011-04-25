@@ -113,6 +113,7 @@
     <Compile Include="Controls\TouchButton.xaml.cs">
       <DependentUpon>TouchButton.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ImageModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -138,6 +139,9 @@
       <DependentUpon>SurfaceWindow1.xaml</DependentUpon>
     </Compile>
     <AppDesigner Include="Properties\" />
+    <Content Include="skeleton.data">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\data\openni.xml">

@@ -35,32 +35,83 @@ namespace InfoStrat.MotionFx.Controls
         }
 
         #endregion
-        
+
+        #region Properties
+
+        #region MotionTrackingClient
+
+        /// <summary>
+        /// The <see cref="MotionTrackingClient" /> dependency property's name.
+        /// </summary>
+        public const string MotionTrackingClientPropertyName = "MotionTrackingClient";
+
+        /// <summary>
+        /// Gets or sets the value of the <see cref="MotionTrackingClient" />
+        /// property. This is a dependency property.
+        /// </summary>
+        public MotionTrackingClient MotionTrackingClient
+        {
+            get
+            {
+                return (MotionTrackingClient)GetValue(MotionTrackingClientProperty);
+            }
+            set
+            {
+                SetValue(MotionTrackingClientProperty, value);
+            }
+        }
+
+        /// <summary>
+        /// Identifies the <see cref="MotionTrackingClient" /> dependency property.
+        /// </summary>
+        public static readonly DependencyProperty MotionTrackingClientProperty = DependencyProperty.Register(
+            MotionTrackingClientPropertyName,
+            typeof(MotionTrackingClient),
+            typeof(DepthView),
+            new UIPropertyMetadata(null, new PropertyChangedCallback(OnMotionTrackingClientPropertyChanged)));
+
+        private static void OnMotionTrackingClientPropertyChanged(DependencyObject obj, DependencyPropertyChangedEventArgs e)
+        {
+            var control = obj as DepthView;
+            if (control == null)
+                return;
+
+            control.SetImageSource();
+        }
+
+        #endregion
+
+        #endregion
+
         public DepthView()
         {
             InitializeComponent();
-
-            Init();
-        }
-
-        private void Init()
-        {
-            HandPointGenerator.Default.FirstFrameReady += new EventHandler(HandPointGenerator_FirstFrameReady);
 
             HandPointGenerator.Default.UserFound += new EventHandler<UserEventArgs>(HandPointGenerator_UserFound);
             HandPointGenerator.Default.UserLost += new EventHandler<UserEventArgs>(HandPointGenerator_UserLost);
             HandPointGenerator.Default.PoseRecognized += new EventHandler<UserEventArgs>(HandPointGenerator_PoseRecognized);
             HandPointGenerator.Default.SkeletonReady += new EventHandler<UserEventArgs>(HandPointGenerator_SkeletonReady);
-            HandPointGenerator.Default.FrameUpdated += new EventHandler(HandPointGenerator_FrameUpdated);
         }
-
-        void HandPointGenerator_FirstFrameReady(object sender, EventArgs e)
+        private void SetImageSource()
         {
-            Dispatcher.Invoke((Action)delegate
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke((Action)delegate
                 {
-                    this.txtStatus.Text = "Ready";
-                    image1.Source = HandPointGenerator.Default.DepthMap;
+                    SetImageSource();
                 });
+                return;
+            }
+
+            if (MotionTrackingClient == null)
+            {
+                this.txtStatus.Text = "";
+                image1.Source = null;
+            }
+            else
+            {
+                image1.Source = MotionTrackingClient.DepthVisualization;
+            }
         }
 
         void HandPointGenerator_UserFound(object sender, UserEventArgs e)
@@ -97,29 +148,6 @@ namespace InfoStrat.MotionFx.Controls
                 this.txtStatus.Text = "Skeleton: " + e.Id;
                 borderUser.Background = Brushes.Green;
                 AnimateUtility.AnimateElementDouble(borderUser, OpacityProperty, 0.5, 0.0, 2.0);
-            });
-        }
-
-        void HandPointGenerator_FrameUpdated(object sender, EventArgs e)
-        {
-
-            if (Application.Current == null)
-            {
-                return;
-            }
-
-        }
-
-        void HandPointGenerator_DataMapUpdated(object sender, MapUpdatedEventArgs e)
-        {
-            if (Application.Current == null)
-            {
-                return;
-            }
-
-            e.GetBitmapSource(this.Dispatcher, (b) =>
-            {
-                image1.Source = b;
             });
         }
     }

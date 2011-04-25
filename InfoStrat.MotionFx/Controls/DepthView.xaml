@@ -8,12 +8,12 @@
              IsHitTestVisible="False">
     <Grid>
         <Border Name="borderUser"
-                Background="#66BBBBBB"
+                Background="#FFBBBBBB"
                 CornerRadius="0"
                 IsHitTestVisible="False"
                 Margin="0"
                 Width="160"
-                Height="180"
+                Height="160"
                 Opacity="1.0">
             <StackPanel>
                 <TextBlock Name="txtStatus"
@@ -25,12 +25,7 @@
                        Height="120"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Center"
-                       Opacity="0.5" />
-                <TextBlock Name="txtTouches"
-                           Text="Loading..."
-                           Margin="10"
-                           FontSize="20"
-                           TextWrapping="Wrap" />
+                       Opacity="1.0" />
             </StackPanel>
         </Border>
     </Grid>

@@ -8,7 +8,7 @@ using Blake.NUI.WPF.Utility;
 
 namespace InfoStrat.MotionFx
 {
-    public static class MotionTracking
+    internal static class MotionTracking
     {
         #region RoutedEvents
 
@@ -66,7 +66,7 @@ namespace InfoStrat.MotionFx
         #endregion
 
         #region MotionTrackingLost
-        
+
         public static readonly RoutedEvent MotionTrackingLostEvent = EventManager.RegisterRoutedEvent("MotionTrackingLost", RoutingStrategy.Bubble, typeof(MotionTrackingEventHandler), typeof(MotionTracking));
 
         public static void AddMotionTrackingLostHandler(DependencyObject d, MotionTrackingEventHandler handler)
@@ -97,139 +97,131 @@ namespace InfoStrat.MotionFx
         #region Constructors
 
         static MotionTracking()
-        {            
-        }
-
-        #endregion
-        
-        #region Static Fields
-
-        private static Dictionary<int, MotionTrackingDevice> deviceDictionary = new Dictionary<int, MotionTrackingDevice>();
-
-        private static PresentationSource presentationSource = null;
-        private static Window rootWindow = null;
-
-        #endregion
-
-        #region Public Static Methods
-
-        public static void RegisterEvents(FrameworkElement root)
         {
-            Window window = VisualUtility.FindVisualParent<Window>(root);
-
-            if (window == null)
-            {
-                throw new ArgumentException("Cannot register events without a window in the visual tree");
-            }
-
-            if (window.IsLoaded)
-            {
-                SubscribeToEvents(window);
-            }
-            else
-            {
-                window.Loaded += (s, e) =>
-                {
-                    SubscribeToEvents(window);
-                };
-            }
-        }
-
-        public static void UnregisterEvents(FrameworkElement root)
-        {
-            Window window = VisualUtility.FindVisualParent<Window>(root);
-
-            if (window == null)
-            {
-                throw new ArgumentException("Cannot register events without a window in the visual tree");
-            }
-
-            HandPointGenerator.Default.StopGenerating();
-        }
-
-        private static void SubscribeToEvents(Window window)
-        {
-            rootWindow = window;
             HandPointGenerator.Default.PointCreated += new EventHandler<HandPointEventArgs>(HandPointGenerator_PointCreated);
             HandPointGenerator.Default.PointUpdated += new EventHandler<HandPointEventArgs>(HandPointGenerator_PointUpdated);
             HandPointGenerator.Default.PointDestroyed += new EventHandler<HandPointEventArgs>(HandPointGenerator_PointDestroyed);
+            HandPointGenerator.Default.FrameUpdated += new EventHandler<FrameUpdatedEventArgs>(HandPointGenerator_FrameUpdated);
+            HandPointGenerator.Default.FirstFrameReady += new EventHandler(HandPointGenerator_FirstFrameReady);
+        }
 
-            HandPointGenerator.Default.StartGenerating(window.Dispatcher);
-            window.Closing += (s, e) =>
+        #endregion
+
+        #region Static Fields
+
+        private static List<MotionTrackingClient> clients = new List<MotionTrackingClient>();
+
+        #endregion
+
+        #region Internal Static Methods
+
+        internal static void RegisterEvents(MotionTrackingClient client)
+        {
+            if (client == null)
+                throw new ArgumentNullException("client");
+
+            bool isFirstClient = false;
+            lock (clients)
+            {
+                if (clients.Count == 0)
+                    isFirstClient = true;
+                clients.Add(client);
+            }
+
+            if (isFirstClient)
+            {
+                HandPointGenerator.Default.StartGenerating();
+            }
+
+        }
+
+        internal static void UnregisterEvents(MotionTrackingClient client)
+        {
+            bool isClientsEmpty = false;
+            lock (clients)
+            {
+                if (clients.Contains(client))
+                {
+                    clients.Remove(client);
+                }
+                isClientsEmpty = clients.Count == 0;
+            }
+            if (isClientsEmpty)
             {
                 HandPointGenerator.Default.StopGenerating();
-            };
+            }
         }
 
         #endregion
 
         #region Private Static Methods
 
-        static void HandPointGenerator_PointCreated(object sender, HandPointEventArgs e)
+        private static void HandPointGenerator_FirstFrameReady(object sender, EventArgs e)
         {
-            if (!rootWindow.CheckAccess())
+            List<MotionTrackingClient> clientsCopy = new List<MotionTrackingClient>();
+            lock (clients)
             {
-                rootWindow.Dispatcher.Invoke(new EventHandler<HandPointEventArgs>(HandPointGenerator_PointCreated), sender, e);
-                return;
+                clientsCopy.AddRange(clients);
             }
-
-            MotionTrackingDevice device = null;
-            if (!deviceDictionary.Keys.Contains(e.Id))
+            foreach (var client in clientsCopy)
             {
-                device = new MotionTrackingDevice(rootWindow);
-                deviceDictionary.Add(e.Id, device);
-            }
-
-            if (device != null)
-            {
-                device.ReportMotionTrackingStarted(e);
+                client.ReportFirstFrameReady();
             }
         }
 
-        static void HandPointGenerator_PointUpdated(object sender, HandPointEventArgs e)
+        private static void HandPointGenerator_FrameUpdated(object sender, FrameUpdatedEventArgs e)
         {
-            if (!rootWindow.CheckAccess())
+            List<MotionTrackingClient> clientsCopy = new List<MotionTrackingClient>();
+            lock (clients)
             {
-                rootWindow.Dispatcher.Invoke(new EventHandler<HandPointEventArgs>(HandPointGenerator_PointUpdated), sender, e);
-                return;
+                clientsCopy.AddRange(clients);
             }
-
-            int id = e.Id;
-            if (!deviceDictionary.Keys.Contains(id))
+            foreach (var client in clientsCopy)
             {
-                HandPointGenerator_PointCreated(sender, e);
-            }
-
-            MotionTrackingDevice device = deviceDictionary[id];
-            if (device != null)
-            {
-                device.ReportMotionTrackingUpdated(e);
+                client.SourceFrameUpdated(e);
             }
         }
 
-        static void HandPointGenerator_PointDestroyed(object sender, HandPointEventArgs e)
+        private static void HandPointGenerator_PointCreated(object sender, HandPointEventArgs e)
         {
-            if (!rootWindow.CheckAccess())
+            List<MotionTrackingClient> clientsCopy = new List<MotionTrackingClient>();
+            lock (clients)
             {
-                rootWindow.Dispatcher.Invoke(new EventHandler<HandPointEventArgs>(HandPointGenerator_PointDestroyed), sender, e);
-                return;
+                clientsCopy.AddRange(clients);
             }
-
-            int id = e.Id;
-            if (!deviceDictionary.Keys.Contains(id))
+            foreach (var client in clientsCopy)
             {
-                return;
+                client.HandPointGenerator_PointCreated(sender, e);
             }
-            MotionTrackingDevice device = deviceDictionary[id];
+        }
 
-            if (device != null)
+        private static void HandPointGenerator_PointUpdated(object sender, HandPointEventArgs e)
+        {
+            List<MotionTrackingClient> clientsCopy = new List<MotionTrackingClient>();
+            lock (clients)
             {
-                device.ReportMotionTrackingLost(e);
+                clientsCopy.AddRange(clients);
             }
-
-            deviceDictionary.Remove(id);
+            foreach (var client in clientsCopy)
+            {
+                client.HandPointGenerator_PointUpdated(sender, e);
+            }
 
         }
+
+        private static void HandPointGenerator_PointDestroyed(object sender, HandPointEventArgs e)
+        {
+            List<MotionTrackingClient> clientsCopy = new List<MotionTrackingClient>();
+            lock (clients)
+            {
+                clientsCopy.AddRange(clients);
+            }
+            foreach (var client in clientsCopy)
+            {
+                client.HandPointGenerator_PointDestroyed(sender, e);
+            }
+        }
+
 
         #endregion
     }

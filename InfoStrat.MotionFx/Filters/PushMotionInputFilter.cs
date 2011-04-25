@@ -46,7 +46,7 @@ namespace InfoStrat.MotionFx.Filters
             MinimumDistancePropertyName,
             typeof(double),
             typeof(PushMotionInputFilter),
-            new UIPropertyMetadata(450.0));
+            new UIPropertyMetadata(400.0));
 
         #endregion
             
@@ -54,7 +54,7 @@ namespace InfoStrat.MotionFx.Filters
         {
             MotionTracking.AddMotionTrackingStartedHandler(element, ProcessEvent);
             MotionTracking.AddMotionTrackingUpdatedHandler(element, ProcessEvent);
-            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEvent);
+            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
 
         protected override void UnregisterEvents(UIElement element)
@@ -63,10 +63,10 @@ namespace InfoStrat.MotionFx.Filters
             MotionTracking.RemoveMotionTrackingUpdatedHandler(element, ProcessEvent);
             MotionTracking.RemoveMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
-        
-        protected override bool IsDeviceValid(bool? wasValid, InputDevice device)
+
+        protected override bool IsDeviceValid(bool? wasValid, InputEventArgs args)
         {
-            var motionDevice = device as MotionTrackingDevice;
+            var motionDevice = args.Device as MotionTrackingDevice;
             if (motionDevice == null)
                 return NotifyTransition(wasValid, motionDevice, true);
             if (motionDevice.Session == null)
@@ -74,7 +74,7 @@ namespace InfoStrat.MotionFx.Filters
 
             Vector3D vector = motionDevice.Session.Position - motionDevice.Session.ShoulderPosition;
 
-            if (Math.Abs(vector.Z) > MinimumDistance)
+            if (vector.Length > MinimumDistance)
                 return NotifyTransition(wasValid, motionDevice, true);
 
             return NotifyTransition(wasValid, motionDevice, false);
@@ -88,13 +88,7 @@ namespace InfoStrat.MotionFx.Filters
             if (wasValid.HasValue &&
                 wasValid != isValid)
             {
-                //this.Dispatcher.BeginInvoke((Action)delegate
-                //    {
-                //        HandPointGenerator.ResetHandSession(device.Session);
-                //    },
-                    //System.Windows.Threading.DispatcherPriority.Input);
-                //HandPointGenerator.ResetHandSession(device.Session);
-                
+
             }
 
             return isValid;

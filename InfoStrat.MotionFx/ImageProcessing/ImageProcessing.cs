@@ -6,132 +6,202 @@ using DirectCanvas;
 using DirectCanvas.Imaging;
 using InfoStrat.MotionFx.ImageProcessing.Effects;
 using DirectCanvas.Misc;
-using System.Windows.Media.Imaging;
-using System.Windows.Media;
 using System.Windows.Threading;
+using DirectCanvas.Brushes;
+using Blake.NUI.WPF.Utility;
 
 namespace InfoStrat.MotionFx.ImageProcessing
 {
     public class ImageProcessor
     {
+        #region Static Properties
+
+        private static ImageProcessor _instance = null;
+
+        public static ImageProcessor Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    DirectCanvas.Misc.Size imageSize = new DirectCanvas.Misc.Size(640, 480);
+                    _instance = new ImageProcessor(imageSize);
+                }
+                return _instance;
+            }
+        }
+
+        #endregion
+
         public DirectCanvasFactory Factory { get; set; }
         public WPFPresenter DepthPresenter { get; private set; }
         DrawingLayer intermediateLayer;
-        DrawingLayer effectLayer;
-        public WPFPresenter HandPresenter { get; private set; }
-        ThresholdEffect effect;
+        DrawingLayer rawDepthLayer;
+        ThresholdEffect thresholdEffect;
+        EdgeDetectEffect edgeEffect;
+        UnpackDepthEffect unpackEffect;
+        ColorMapDepthEffect colorMapEffect;
+        SolidColorBrush hoverBrush;
+        SolidColorBrush contactBrush;
+        Brush DepthBrush;
 
-        public ImageProcessor(Size ImageSize, Dispatcher dispatcher)
+        Dictionary<MotionTrackingScreen, WPFPresenter> ScreenVisualizations = new Dictionary<MotionTrackingScreen, WPFPresenter>();
+
+        public ImageProcessor(Size ImageSize)
         {
-            Factory = new DirectCanvasFactory();
-            effect = new ThresholdEffect(Factory);
-            InitLayers(ImageSize, dispatcher);
+            try
+            {
+                Factory = new DirectCanvasFactory();
+                thresholdEffect = new ThresholdEffect(Factory);
+                edgeEffect = new EdgeDetectEffect(Factory);
+                unpackEffect = new UnpackDepthEffect(Factory);
+                colorMapEffect = new ColorMapDepthEffect(Factory);
+                InitLayers(ImageSize);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine("Exception initializing ImageProcessor: " + ex.ToString());
+            }
         }
 
-        public void InitLayers(Size ImageSize, Dispatcher dispatcher)
+        public void InitLayers(Size ImageSize)
         {
+            hoverBrush = Factory.CreateSolidColorBrush(new Color4(.4f, 0, 0, 0));
+            contactBrush = Factory.CreateSolidColorBrush(new Color4(.8f, 0, 0, 0));
+
             DepthPresenter = new WPFPresenter(Factory, ImageSize.Width, ImageSize.Height);
             intermediateLayer = Factory.CreateDrawingLayer(ImageSize.Width, ImageSize.Height);
-            effectLayer = Factory.CreateDrawingLayer(ImageSize.Width, ImageSize.Height);
-            HandPresenter = new WPFPresenter(Factory, ImageSize.Width, ImageSize.Height);
+            rawDepthLayer = Factory.CreateDrawingLayer(ImageSize.Width, ImageSize.Height);
+
+            DepthBrush = Factory.CreateDrawingLayerBrush(DepthPresenter);
+            DepthBrush.Alignment = DirectCanvas.Brushes.BrushAlignment.DrawingLayerAbsolute;
         }
 
-        public static void ConvertImageToBitmapSource(Dispatcher dispatcher, Action<BitmapSource> BitmapSourceCallback, Image image)
+        public void AddScreen(MotionTrackingScreen screen)
         {
-            if (dispatcher == null)
-                throw new ArgumentNullException("dispatcher");
-
-            if (BitmapSourceCallback == null)
-                throw new ArgumentNullException("BitmapSourceCallback");
-
-            dispatcher.Invoke((Action)delegate
-                {
-                    var imageData = image.Lock(ImageLock.Read);
-                    BitmapSource bitmap = BitmapSource.Create(image.Width, image.Height, 96, 96,
-                                                              PixelFormats.Bgra32, null,
-                                                                imageData.Scan0, imageData.BufferSize, imageData.Stride);
-
-                    image.Unlock(imageData);
-                    BitmapSourceCallback(bitmap);
-                });
+            WPFPresenter presenter = new WPFPresenter(Factory, DepthPresenter.Width, DepthPresenter.Height);
+            ScreenVisualizations.Add(screen, presenter);
         }
 
-        private unsafe void LoadData(Image image, byte[] sourceData)
+        public System.Windows.Media.ImageSource GetImageSourceForScreen(MotionTrackingScreen screen)
         {
-            var imageData = image.Lock(ImageLock.ReadWrite);
-
-            byte* data = (byte*)imageData.Scan0.ToPointer();
-            int index = 0;
-            for (int i = 0; i < imageData.BufferSize; i += 4, index++)
+            if (ScreenVisualizations.ContainsKey(screen))
             {
-                //byte value = (byte)((double)i * 255 / (double)imageData.BufferSize);
-                for (int k = 0; k < 3; k++)
-                {
-                    if (i + k < imageData.BufferSize)
-                        data[i + k] = sourceData[index];
-                }
-                data[i + 3] = 255;
+                return ScreenVisualizations[screen].ImageSource;
             }
-
-            image.Unlock(imageData);
+            return null;
         }
 
-        public unsafe void SaveImageToBytes(Image image, ref byte[] targetData)
+        public void RemoveScreen(MotionTrackingScreen screen)
         {
-            var imageData = image.Lock(ImageLock.ReadWrite);
-
-            byte* data = (byte*)imageData.Scan0.ToPointer();
-            int index = 0;
-            int size = imageData.BufferSize;
-            for (int i = 0; i < size; i += 4, index++)
+            if (ScreenVisualizations.ContainsKey(screen))
             {
-                for (int k = 0; k < 4; k++)
-                {
-                    //if (i + k < imageData.BufferSize)
-                    targetData[i + k] = data[i + k];
-                }
+                ScreenVisualizations.Remove(screen);
             }
-
-            image.Unlock(imageData);
         }
 
-        public void ProcessDepthSessions(Image depthImage, Dictionary<int, HandSession> sessions)
+        public void ProcessDepthSessions(Image depthImage, Dictionary<int, MotionTrackingDevice> devices)
         {
-            DepthPresenter.CopyFromImage(depthImage);
-
-            var depthBrush = Factory.CreateDrawingLayerBrush(DepthPresenter);
-            depthBrush.Alignment = DirectCanvas.Brushes.BrushAlignment.DrawingLayerAbsolute;
-
-
-            HandPresenter.Clear();
-
-            effectLayer.Clear();
-
-            foreach (var kvp in sessions)
+            if (depthImage != null)
             {
-                var session = kvp.Value;
+                intermediateLayer.CopyFromImage(depthImage);
+
+                unpackEffect.TexSize = new DirectCanvas.Misc.Size(rawDepthLayer.Width/2, rawDepthLayer.Height);
+                intermediateLayer.ApplyEffect(unpackEffect, rawDepthLayer, true);
+
+                colorMapEffect.MinThreshold = 100f;
+                colorMapEffect.MaxThreshold = 10000f;
+                colorMapEffect.MaxValue = 2500f;
+                rawDepthLayer.ApplyEffect(colorMapEffect, DepthPresenter, true);
+
+                //edgeEffect.Tint = new Color4(1, 1, 0, 0);
+                //edgeEffect.MinThreshold = 100f;
+                //edgeEffect.MaxThreshold = 3000f;
+                //edgeEffect.EdgeThreshold = 200f;
+                //edgeEffect.TexSize = new Size(rawDepthLayer.Width, rawDepthLayer.Height);
+                //rawDepthLayer.ApplyEffect(edgeEffect, DepthPresenter, true);
+            }
+            foreach (var kvp in ScreenVisualizations)
+            {
+                var screen = kvp.Key;
+                var handPresenter = kvp.Value;
+                UpdateScreenVisualization(devices, screen, handPresenter);
+            }
+            if (depthImage != null)
+            {
+                DepthPresenter.Present();
+            }
+        }
+
+        private void UpdateScreenVisualization(Dictionary<int, MotionTrackingDevice> devices, MotionTrackingScreen screen, WPFPresenter handPresenter)
+        {
+            handPresenter.Clear();
+            
+            edgeEffect.Tint = new Color4(1, 1, 0, 0);
+            edgeEffect.MinThreshold = 300f;
+            edgeEffect.MaxThreshold = 10000f;
+            edgeEffect.EdgeThreshold = 100f;
+            edgeEffect.TexSize = new Size(intermediateLayer.Width, intermediateLayer.Height);
+
+            foreach (var innerkvp in devices)
+            {
+                var session = innerkvp.Value.Session;
                 var rectf = new RectangleF((float)(session.PositionProjective.X - 100), (float)(session.PositionProjective.Y - 100), 200, 200);
-                intermediateLayer.Clear();
-                intermediateLayer.BeginDraw();
-                
-                intermediateLayer.FillRectangle(depthBrush, rectf);
+                if (!screen.IsSessionInBounds(session))
+                {
+                    continue;
+                }
 
-                intermediateLayer.EndDraw();
+                var p = screen.MapPositionToScreen(session, handPresenter.Width, handPresenter.Height);
 
-                if (session.IsPromotedToTouch)
-                    effect.Tint = new Color4(.8f, 0, 0, 0);
+                var targetRectf = new RectangleF((float)(p.X - 100), (float)(p.Y - 100), 200, 200);
+
+                if (innerkvp.Value.ShouldPromoteToTouch)
+                    thresholdEffect.Tint = new Color4(.8f, 0, 0, 0);
                 else
-                    effect.Tint = new Color4(.4f, 0, 0, 0);
-                effect.MinThreshold = (float)(session.PositionProjective.Z - 100);
-                effect.MaxThreshold = (float)(session.PositionProjective.Z + 100);
-                intermediateLayer.ApplyEffect(effect, effectLayer, false);
+                    thresholdEffect.Tint = new Color4(.4f, 0, 0, 0);
+                thresholdEffect.MinThreshold = (float)(session.PositionProjective.Z - 100);
+                thresholdEffect.MaxThreshold = (float)(session.PositionProjective.Z + 100);
+                rawDepthLayer.ApplyEffect(thresholdEffect, intermediateLayer, true);
 
-                HandPresenter.BeginCompose();
-                HandPresenter.ComposeLayer(effectLayer, rectf, rectf, new RotationParameters(), new Color4(1, 1, 1, 1));
-                HandPresenter.EndCompose();
+                //intermediateLayer.ApplyEffect(unpackEffect, effectLayer, true);
+
+                //handPresenter.BeginDraw();
+                //if (session.IsPromotedToTouch)
+                //handPresenter.FillEllipse(contactBrush, new DirectCanvas.Shapes.Ellipse(new PointF((float)p.X, (float)p.Y), 20, 20));
+                //else
+                //  handPresenter.FillEllipse(hoverBrush, new DirectCanvas.Shapes.Ellipse(new PointF((float)p.X, (float)p.Y), 20, 20));
+                //handPresenter.EndDraw();
+                var tint = new Color4(1, 1, 1, 1);
+                //if (innerkvp.Value.ShouldPromoteToTouch)
+                //{
+                //    tint.Alpha = 0.8f;
+                //}
+                handPresenter.BeginCompose();
+                handPresenter.ComposeLayer(intermediateLayer, rectf, targetRectf, new RotationParameters(), tint);
+                handPresenter.EndCompose();
             }
-            DepthPresenter.Present();
-            HandPresenter.Present();
+
+            handPresenter.Present();
+        }
+
+        public System.Windows.Media.ImageSource ImageToImageSource(DepthFrame frame)
+        {
+            WPFPresenter presenter = new WPFPresenter(Factory, frame.Width, frame.Height);
+            ushort minValue;
+            ushort maxValue;
+            var image = frame.ToDirectCanvasImage(Factory, out minValue, out maxValue);
+            
+            rawDepthLayer.CopyFromImage(image);
+
+            unpackEffect.MinThreshold = 100f;
+            unpackEffect.MaxThreshold = 1000f;
+            unpackEffect.MinValue = minValue;
+            unpackEffect.MaxValue = maxValue;
+            unpackEffect.TexSize = new DirectCanvas.Misc.Size(rawDepthLayer.Width, rawDepthLayer.Height);
+            rawDepthLayer.ApplyEffect(unpackEffect, presenter, true);
+            presenter.Present();
+            return presenter.ImageSource;
         }
     }
 }

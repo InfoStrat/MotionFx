@@ -22,6 +22,53 @@ namespace InfoStrat.MotionFx.Controls
     {
         Window window = null;
 
+        #region Properties
+
+        #region MotionTrackingClient
+
+        /// <summary>
+        /// The <see cref="MotionTrackingClient" /> dependency property's name.
+        /// </summary>
+        public const string MotionTrackingClientPropertyName = "MotionTrackingClient";
+
+        /// <summary>
+        /// Gets or sets the value of the <see cref="MotionTrackingClient" />
+        /// property. This is a dependency property.
+        /// </summary>
+        public MotionTrackingClient MotionTrackingClient
+        {
+            get
+            {
+                return (MotionTrackingClient)GetValue(MotionTrackingClientProperty);
+            }
+            set
+            {
+                SetValue(MotionTrackingClientProperty, value);
+            }
+        }
+
+        /// <summary>
+        /// Identifies the <see cref="MotionTrackingClient" /> dependency property.
+        /// </summary>
+        public static readonly DependencyProperty MotionTrackingClientProperty = DependencyProperty.Register(
+            MotionTrackingClientPropertyName,
+            typeof(MotionTrackingClient),
+            typeof(HandVisualization),
+            new UIPropertyMetadata(null, new PropertyChangedCallback(OnMotionTrackingClientPropertyChanged)));
+
+        private static void OnMotionTrackingClientPropertyChanged(DependencyObject obj, DependencyPropertyChangedEventArgs e)
+        {
+            var control = obj as HandVisualization;
+            if (control == null)
+                return;
+
+            control.SetImageSource();
+        }
+
+        #endregion
+        
+        #endregion
+
         #region Constructors
 
         public HandVisualization()
@@ -30,9 +77,12 @@ namespace InfoStrat.MotionFx.Controls
             this.Loaded += new RoutedEventHandler(HandVisualization_Loaded);
         }
 
+        #endregion
+
+        #region Private Methods
+
         void HandVisualization_Loaded(object sender, RoutedEventArgs e)
         {
-
             window = VisualUtility.FindVisualParent<Window>(this);
 
             if (window == null)
@@ -40,38 +90,41 @@ namespace InfoStrat.MotionFx.Controls
                 throw new InvalidOperationException("HandVisualization must be within the visual tree of a Window-derived control");
             }
 
-            if (!window.IsLoaded)
+            VerifyNoTransform(window);
+
+            image1.Width = window.ActualWidth;
+            image1.Height = window.ActualHeight;
+        }
+        
+        private void SetImageSource()
+        {
+            if (!Dispatcher.CheckAccess())
             {
-                window.Loaded += (s, ee) =>
-                {
-                    Init();
-                };
+                Dispatcher.Invoke((Action)delegate
+                    {
+                        SetImageSource();
+                    });
+                return;
+            }
+
+            if (MotionTrackingClient == null)
+            {
+                image1.Source = null;
             }
             else
             {
-                Init();
+                if (MotionTrackingClient.IsFirstFrameReady)
+                {
+                    image1.Source = MotionTrackingClient.HandVisualization;
+                }
+                else
+                {
+                    MotionTrackingClient.FirstFrameReady += (s, e) =>
+                        {
+                            SetImageSource();
+                        };
+                }
             }
-        }
-
-        #endregion
-
-        #region Private Methods
-
-
-        private void Init()
-        {
-            VerifyNoTransform(window);
-            image1.Width = window.ActualWidth;
-            image1.Height = window.ActualHeight;
-            HandPointGenerator.Default.FirstFrameReady += new EventHandler(Default_FirstFrameReady);
-        }
-
-        void Default_FirstFrameReady(object sender, EventArgs e)
-        {
-            Dispatcher.Invoke((Action)delegate
-            {
-                image1.Source = HandPointGenerator.Default.HandMap;
-            });
         }
 
         private void VerifyNoTransform(Window window)

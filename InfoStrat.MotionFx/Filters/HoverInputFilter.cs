@@ -14,7 +14,7 @@ namespace InfoStrat.MotionFx.Filters
         {
             MotionTracking.AddMotionTrackingStartedHandler(element, ProcessEvent);
             MotionTracking.AddMotionTrackingUpdatedHandler(element, ProcessEvent);
-            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEvent);
+            MotionTracking.AddMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
 
         protected override void UnregisterEvents(UIElement element)
@@ -24,9 +24,9 @@ namespace InfoStrat.MotionFx.Filters
             MotionTracking.RemoveMotionTrackingLostHandler(element, ProcessEventDeactivation);
         }
 
-        protected override bool IsDeviceValid(bool? wasValid, InputDevice device)
+        protected override bool IsDeviceValid(bool? wasValid, InputEventArgs args)
         {
-            var motionDevice = device as MotionTrackingDevice;
+            var motionDevice = args.Device as MotionTrackingDevice;
             if (motionDevice != null)
                 motionDevice.ShouldPromoteToTouch = true;
             return true;

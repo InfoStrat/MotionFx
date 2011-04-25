@@ -1,0 +1,113 @@
+﻿Texture2D InputTexture : register(t0);
+
+SamplerState TextureSampler : register(s0)
+{
+	Filter = MIN_MAG_MIP_POINT;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+cbuffer psconstants0 : register(b0)
+{
+	float4 tint : packoffset(c0);
+};
+
+cbuffer PSConstants1 : register(b1)
+{
+	float MinThreshold : packoffset(c0);
+};
+
+cbuffer PSConstants2 : register(b2)
+{
+	float MaxThreshold : packoffset(c0);
+};
+
+cbuffer PSConstants5 : register(b3)
+{
+	float TexSizeX : packoffset(c0);
+}
+
+cbuffer PSConstants5 : register(b4)
+{
+	float TexSizeY : packoffset(c0);
+}
+
+cbuffer PSConstants5 : register(b5)
+{
+	float EdgeThresholdSq : packoffset(c0);
+}
+
+struct PSInput
+{
+    float4 PositionCS : SV_Position;
+    float2 TexCoord : TEXCOORD;
+};
+
+int Unpack(float4 value)
+{
+	return value.b * 256  + value.g * 256 * 256;
+}
+
+bool IsEdge(float2 coord, float coord2)
+{
+	float4 sample = InputTexture.Sample(TextureSampler, coord);
+	float4 sample2 = InputTexture.Sample(TextureSampler, coord2);
+	int value = Unpack(sample);
+	int value2 = Unpack(sample2);
+
+	if (value > MinThreshold && 
+		value < MaxThreshold &&
+		value2 > MaxThreshold)
+	{
+		return true;
+	}
+	return false;
+}
+
+float2 GetTexCoord(float2 input, float2 offset)
+{
+	float2 res = float2(1 / TexSizeX, 1 / TexSizeY);
+	return input + offset * res;
+}
+
+float4 GetSample(float2 input, float2 offset)
+{
+	return InputTexture.Sample(TextureSampler, GetTexCoord(input, offset));
+}
+
+float4 DetectEdges(in PSInput input)
+{
+	float2 texCoord = input.TexCoord;
+
+	int s22 = Unpack(GetSample(texCoord, float2(0,0)));
+	
+	float4 color = float4(0, 0, 0, 1);
+	if (s22 < MinThreshold ||
+		s22 > MaxThreshold)
+		return color;
+
+	int s11 = GetSample(texCoord, float2(-1,-1)); 
+	int s12 = GetSample(texCoord, float2(0,-1)); 
+	int s13 = GetSample(texCoord, float2(1,-1)); 
+	
+	int s21 = GetSample(texCoord, float2(-1,0)); 
+	int s23 = GetSample(texCoord, float2(1,0)); 
+	
+	int s31 = GetSample(texCoord, float2(-1,1)); 
+	int s32 = GetSample(texCoord, float2(0,1)); 
+	int s33 = GetSample(texCoord, float2(1,1)); 
+	
+	float t1 = s13 + s33 + 2*s23 - s11 - 2*s21 - s31;
+	float t2 = s31 + s33 + 2*s32 - s11 - 2*s12 - s13;
+
+	if ((t1*t1 + t2*t2) > EdgeThresholdSq)
+	{
+		color = tint;
+	}
+    return color;
+}
+
+float4 EdgeDetectMain(in PSInput input) : SV_Target
+{
+	return DetectEdges(input);
+}

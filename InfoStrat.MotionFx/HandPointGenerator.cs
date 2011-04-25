@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using xn;
 using System.Threading;
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
@@ -13,13 +12,16 @@ using System.Windows.Media.Media3D;
 using InfoStrat.MotionFx.ImageProcessing;
 using DirectCanvas.Imaging;
 using System.Windows.Threading;
+using OpenNI;
+using System.IO;
+using System.Runtime.InteropServices;
 
 namespace InfoStrat.MotionFx
 {
     public class HandPointGenerator
     {
         bool isFirstPoseAttempted = false;
-
+        string skeletonFile = "skeleton.data";
         #region Static Properties
 
         private static HandPointGenerator _default;
@@ -39,8 +41,6 @@ namespace InfoStrat.MotionFx
 
         bool IsGeneratorThreadRunning = false;
 
-        ImageProcessor imageProcessor;
-
         bool firstFrameNotified = false;
 
         Thread generationThread;
@@ -52,7 +52,7 @@ namespace InfoStrat.MotionFx
         private SkeletonCapability skeletonCapability;
         private PoseDetectionCapability poseDetectionCapability;
         private string calibPose;
-        private Dictionary<uint, Dictionary<SkeletonJoint, SkeletonJointPosition>> joints;
+        private Dictionary<int, Dictionary<SkeletonJoint, SkeletonJointPosition>> joints;
 
         private int[] histogram;
 
@@ -60,35 +60,12 @@ namespace InfoStrat.MotionFx
 
         private Color[] colors = { Colors.Red, Colors.Blue, Colors.ForestGreen, Colors.Yellow, Colors.Orange, Colors.Purple, Colors.White };
         private Color[] anticolors = { Colors.Green, Colors.Orange, Colors.Red, Colors.Purple, Colors.Blue, Colors.Yellow, Colors.Black };
-        private int ncolors = 6;
-
-        bool isFirstCalibrationComplete = false;
-
+        
+        ushort[] pixels;
         #endregion
 
         #region Properties
 
-        public ImageSource DepthMap
-        {
-            get
-            {
-                if (imageProcessor == null ||
-                    imageProcessor.DepthPresenter == null)
-                    return null;
-                return imageProcessor.DepthPresenter.ImageSource;
-            }
-        }
-
-        public ImageSource HandMap
-        {
-            get
-            {
-                if (imageProcessor == null ||
-                    imageProcessor.HandPresenter == null)
-                    return null;
-                return imageProcessor.HandPresenter.ImageSource;
-            }
-        }
 
         #endregion
 
@@ -200,13 +177,14 @@ namespace InfoStrat.MotionFx
 
         #region FrameUpdated
 
-        public event EventHandler FrameUpdated;
+        public event EventHandler<FrameUpdatedEventArgs> FrameUpdated;
 
-        private void OnFrameUpdated()
+        private void OnFrameUpdated(ushort[] pixels, int width, int height)
         {
             if (FrameUpdated == null)
                 return;
-            FrameUpdated(null, EventArgs.Empty);
+            var args = new FrameUpdatedEventArgs(pixels, width, height, HandSessions.Values.AsEnumerable<HandSession>());
+            FrameUpdated(null, args);
         }
 
         #endregion
@@ -226,14 +204,6 @@ namespace InfoStrat.MotionFx
 
         public void StartGenerating()
         {
-            StartGenerating(Dispatcher.CurrentDispatcher);
-        }
-
-        public void StartGenerating(Dispatcher dispatcher)
-        {
-            DirectCanvas.Misc.Size imageSize = new DirectCanvas.Misc.Size(640, 480);
-            imageProcessor = new ImageProcessor(imageSize, dispatcher);
-
             ThreadStart start = new ThreadStart(DoGeneratePointsWorker);
             generationThread = new Thread(start);
 
@@ -273,9 +243,9 @@ namespace InfoStrat.MotionFx
                         break;
                     context.WaitAndUpdateAll();
                 }
-                catch (XnStatusException ex)
+                catch (StatusException ex)
                 {
-                    Trace.WriteLine("XnStatusException: " + ex.ToString());
+                    Trace.WriteLine("OpenNI StatusException: " + ex.ToString());
                 }
                 catch (Exception ex)
                 {
@@ -301,9 +271,9 @@ namespace InfoStrat.MotionFx
                     context = new Context(initFile);
                     isInit = true;
                 }
-                catch (XnStatusException ex)
+                catch (StatusException ex)
                 {
-                    Trace.WriteLine("XnStatusException: " + ex.ToString());
+                    Trace.WriteLine("OpenNI StatusException: " + ex.ToString());
                     isInit = false;
                     Thread.Sleep(1000);
                 }
@@ -316,26 +286,26 @@ namespace InfoStrat.MotionFx
                 }
             }
 
-            this.joints = new Dictionary<uint, Dictionary<SkeletonJoint, SkeletonJointPosition>>();
+            this.joints = new Dictionary<int, Dictionary<SkeletonJoint, SkeletonJointPosition>>();
 
             this.userGenerator = new UserGenerator(this.context);
-            this.skeletonCapability = new SkeletonCapability(this.userGenerator);
-            this.poseDetectionCapability = new PoseDetectionCapability(this.userGenerator);
-            this.calibPose = this.skeletonCapability.GetCalibrationPose();
+            this.skeletonCapability = userGenerator.SkeletonCapability;
+            this.poseDetectionCapability = userGenerator.PoseDetectionCapability;
+            this.calibPose = this.skeletonCapability.CalibrationPose;
 
-            this.userGenerator.NewUser += new UserGenerator.NewUserHandler(userGenerator_NewUser);
-            this.userGenerator.LostUser += new UserGenerator.LostUserHandler(userGenerator_LostUser);
-            this.poseDetectionCapability.PoseDetected += new PoseDetectionCapability.PoseDetectedHandler(poseDetectionCapability_PoseDetected);
-            this.skeletonCapability.CalibrationEnd += new SkeletonCapability.CalibrationEndHandler(skeletonCapability_CalibrationEnd);
+            this.userGenerator.NewUser += new EventHandler<NewUserEventArgs>(userGenerator_NewUser);
+            this.userGenerator.LostUser += new EventHandler<UserLostEventArgs>(userGenerator_LostUser);
+            this.poseDetectionCapability.PoseDetected += new EventHandler<PoseDetectedEventArgs>(poseDetectionCapability_PoseDetected);
+            this.skeletonCapability.CalibrationEnd += new EventHandler<CalibrationEndEventArgs>(skeletonCapability_CalibrationEnd);
 
             this.skeletonCapability.SetSkeletonProfile(SkeletonProfile.Upper);
             this.userGenerator.StartGenerating();
 
             depthGenerator = context.FindExistingNode(NodeType.Depth) as DepthGenerator;
 
-            depthGenerator.NewDataAvailable += new StateChangedHandler(depthGenerator_NewDataAvailable);
+            depthGenerator.NewDataAvailable += new EventHandler(depthGenerator_NewDataAvailable);
 
-            this.histogram = new int[depthGenerator.GetDeviceMaxDepth()];
+            this.histogram = new int[depthGenerator.DeviceMaxDepth];
 
             depthGenerator.StartGenerating();
 
@@ -343,27 +313,29 @@ namespace InfoStrat.MotionFx
 
         #region Skeleton Methods
 
-        void skeletonCapability_CalibrationEnd(ProductionNode node, uint id, bool success)
+        void skeletonCapability_CalibrationEnd(object sender, CalibrationEndEventArgs e)
         {
-            if (success)
+            int id = e.ID;
+            if (e.Success)
             {
                 this.skeletonCapability.StartTracking(id);
                 this.joints.Add(id, new Dictionary<SkeletonJoint, SkeletonJointPosition>());
-                this.skeletonCapability.SaveCalibrationData(id, 0);
-                isFirstCalibrationComplete = true;
+                //this.skeletonCapability.SaveCalibrationData(id, 0);
+                this.skeletonCapability.SaveCalibrationDataToFile(id, skeletonFile);
                 OnSkeletonReady((int)id);
             }
             else
             {
-               // this.skeletonCapability.RequestCalibration(id, true);
+                // this.skeletonCapability.RequestCalibration(id, true);
                 this.poseDetectionCapability.StartPoseDetection(calibPose, id);
                 OnUserFound((int)id);
                 isFirstPoseAttempted = false;
             }
         }
 
-        void poseDetectionCapability_PoseDetected(ProductionNode node, string pose, uint id)
+        void poseDetectionCapability_PoseDetected(object sender, PoseDetectedEventArgs e)
         {
+            int id = e.ID;
             if (isFirstPoseAttempted || this.skeletonCapability.IsCalibrating(id))
                 return;
             isFirstPoseAttempted = true;
@@ -373,41 +345,52 @@ namespace InfoStrat.MotionFx
             OnPoseRecognized((int)id);
         }
 
-        void userGenerator_NewUser(ProductionNode node, uint id)
+        void userGenerator_NewUser(object sender, NewUserEventArgs e)
         {
-            if (isFirstCalibrationComplete)
+            int id = e.ID;
+            try
             {
-                OnUserFound((int)id);
-                this.skeletonCapability.LoadCalibrationData(id, 0);
-                this.skeletonCapability.StartTracking(id);
-                this.joints.Add(id, new Dictionary<SkeletonJoint, SkeletonJointPosition>());
-                OnSkeletonReady((int)id);
+                if (File.Exists(skeletonFile))
+                {
+                    OnUserFound(id);
+                    this.skeletonCapability.LoadCalibrationDataFromFile(id, "skeleton.data");
+                    //this.skeletonCapability.LoadCalibrationData(id, 0);
+                    this.skeletonCapability.StartTracking(id);
+                    this.joints.Add(id, new Dictionary<SkeletonJoint, SkeletonJointPosition>());
+                    OnSkeletonReady(id);
+                }
+                else
+                {
+                    this.poseDetectionCapability.StartPoseDetection(this.calibPose, id);
+                    OnUserFound(id);
+                }
             }
-            else if (!isFirstPoseAttempted)
+            catch (StatusException)
             {
                 this.poseDetectionCapability.StartPoseDetection(this.calibPose, id);
-                OnUserFound((int)id);
+                OnUserFound(id);
             }
         }
 
-        void userGenerator_LostUser(ProductionNode node, uint id)
+
+        void userGenerator_LostUser(object sender, UserLostEventArgs e)
         {
+            int id = e.ID;
             if (joints.ContainsKey(id))
             {
                 this.joints.Remove(id);
-                DestroyHandSession((int)id * 2);
-                DestroyHandSession((int)id * 2 + 1);
+                DestroyHandSession(id * 2);
+                DestroyHandSession(id * 2 + 1);
             }
-            OnUserLost((int)id);
+            OnUserLost(id);
         }
 
-        private void GetJoint(uint user, SkeletonJoint joint)
+        private void GetJoint(int user, SkeletonJoint joint)
         {
-            SkeletonJointPosition pos = new SkeletonJointPosition();
-            this.skeletonCapability.GetSkeletonJointPosition(user, joint, ref pos);
-            if (pos.position.Z == 0)
+            SkeletonJointPosition pos = this.skeletonCapability.GetSkeletonJointPosition(user, joint);
+            if (pos.Position.Z == 0)
             {
-                pos.fConfidence = 0;
+                pos.Confidence = 0;
             }
             else
             {
@@ -430,14 +413,14 @@ namespace InfoStrat.MotionFx
                         this.joints[user][joint] = pos;
                     }
                 }
-                catch (NullReferenceException ex)
+                catch (NullReferenceException)
                 {
                     //eat it
                 }
             }
         }
 
-        private void GetJoints(uint user)
+        private void GetJoints(int user)
         {
             GetJoint(user, SkeletonJoint.Head);
             GetJoint(user, SkeletonJoint.Neck);
@@ -463,10 +446,10 @@ namespace InfoStrat.MotionFx
 
         private void DrawLine(byte[] fullmap, Color color, Dictionary<SkeletonJoint, SkeletonJointPosition> dict, SkeletonJoint j1, SkeletonJoint j2)
         {
-            xn.Point3D pos1 = this.depthGenerator.ConvertRealWorldToProjective(dict[j1].position);
-            xn.Point3D pos2 = this.depthGenerator.ConvertRealWorldToProjective(dict[j2].position);
+            OpenNI.Point3D pos1 = this.depthGenerator.ConvertRealWorldToProjective(dict[j1].Position);
+            OpenNI.Point3D pos2 = this.depthGenerator.ConvertRealWorldToProjective(dict[j2].Position);
 
-            if (dict[j1].fConfidence == 0 || dict[j2].fConfidence == 0)
+            if (dict[j1].Confidence == 0 || dict[j2].Confidence == 0)
                 return;
 
             float deltaX = pos2.X - pos1.X;
@@ -488,7 +471,7 @@ namespace InfoStrat.MotionFx
             }
         }
 
-        private void DrawSkeleton(byte[] map, Color color, uint user)
+        private void DrawSkeleton(byte[] map, Color color, int user)
         {
             GetJoints(user);
             Dictionary<SkeletonJoint, SkeletonJointPosition> dict = this.joints[user];
@@ -519,571 +502,60 @@ namespace InfoStrat.MotionFx
 
         #endregion
 
-        unsafe void depthGenerator_NewDataAvailable(ProductionNode node)
+        unsafe void depthGenerator_NewDataAvailable(object sender, EventArgs e)
         {
             if (Application.Current == null)
             {
                 IsGeneratorThreadRunning = false;
                 return;
             }
-            DepthMetaData depthMD = new DepthMetaData();
-
-            depthGenerator.GetMetaData(depthMD);
-
-            if (depthMD.DataSize == 0)
-                return;
-
-            int numPixels = (int)(depthMD.XRes * depthMD.YRes);
-
-            ushort* sourceData = (ushort*)depthMD.DepthMapPtr.ToPointer();
-
-            Image sourceImage = imageProcessor.Factory.CreateImage(depthMD.FullXRes, depthMD.FullYRes);
-            CopyImageData(numPixels, sourceData, sourceImage);
-
-            UpdateSessions();
-
-            imageProcessor.ProcessDepthSessions(sourceImage, HandSessions);
-
-            if (!firstFrameNotified)
+            try
             {
-                OnFirstFrameReady();
-                firstFrameNotified = true;
+                DepthMetaData depthMD = new DepthMetaData();
+
+                depthGenerator.GetMetaData(depthMD);
+
+                if (depthMD.DataSize == 0)
+                    return;
+
+                int numPixels = (int)(depthMD.XRes * depthMD.YRes);
+
+                //ushort* sourceData = (ushort*)depthMD.DepthMapPtr.ToPointer();
+                if (pixels == null ||
+                    pixels.Length != numPixels)
+                {
+                    pixels = new ushort[numPixels];
+                }
+
+                fixed (ushort* dest = pixels)
+                {
+                    NativeInterop.MoveMemory((IntPtr)dest, depthMD.DepthMapPtr, numPixels * sizeof(ushort));
+                }
+                //for (int i = 0; i < numPixels; i++, sourceData++)
+                //{
+                //    pixels[i] = *sourceData;
+                //}
+
+                UpdateSessions();
+
+                if (!firstFrameNotified)
+                {
+                    OnFirstFrameReady();
+                    firstFrameNotified = true;
+                }
+
+                OnFrameUpdated(pixels, depthMD.XRes, depthMD.YRes);
             }
-
-            OnFrameUpdated();
-
+            catch (Exception ex)
+            {
+                Trace.WriteLine("HandPointGenerator - ImageProcessor exception: " + ex.ToString());
+            }
         }
 
-        void Comments()
+        private void UpdateSessions()
         {
-            /*
-            //copy so we don't have to lock
-            var sessions = new Dictionary<int, HandSession>(HandSessions);
-
-            if (sessions.Count != 0)
-            {
-                //int rightOffset = 1;
-                //int leftOffset = -1;
-                //int downOffset = srcStride;
-                //int upOffset = -srcStride;
-                //int rightDownOffset = rightOffset + downOffset;
-                //int rightUpOffset = rightOffset + upOffset;
-                //int leftDownOffset = leftOffset + downOffset;
-                //int leftUpOffset = leftOffset + upOffset;
-
-                //For each tracked hand
-                foreach (var kvp in sessions)
-                {
-                    HandSession hand = kvp.Value;
-                    hand.PolarPoints.Clear();
-                    
-                    //Get the image-centric hand position
-                    xn.Point3D projective = depthGenerator.ConvertRealWorldToProjective(hand.xnPosition);
-                    
-                    int x = (int)projective.X;
-                    int y = (int)projective.Y;
-
-                    ushort[] handMapDepthVals = new ushort[hand.XRes * hand.YRes];
-                    byte[] handMap = hand.HandMap;
-                    byte[] handMapDepth = hand.HandMapDepth;
-
-                    if (x < 0 || x >= XRes ||
-                        y < 0 || y >= YRes)
-                        continue;
-                    ushort targetDepth = sourceData[x + y * srcStride];
-
-                    Image handImage = imageProcessor.CropHandImage(sourceImage, x, y, 
-                                                                  (ushort)(targetDepth - 100),
-                                                                  (ushort)(targetDepth + 100));
-
-                    imageProcessor.SaveImageToBytes(handImage, ref handMap);
-             */
-            /*
-            int avgX = 0;
-            int avgY = 0;
-            int avgCount = 0;
-            //For a 200x200 pixel box centered on the hand position
-            int handStride = hand.Stride;
-            int handXRes = hand.XRes;
-            for (int mapX = 0; mapX < 200; mapX++)
-            {
-                for (int mapY = 0; mapY < 200; mapY++)
-                {
-                    int mapIndex = mapX * 4 + mapY * handStride;
-                    int mapIndexVals = mapX + mapY * handXRes;
-
-                    for (int k = 0; k < 4; k++)
-                    {
-                        handMap[mapIndex + k] = 0;
-                        handMapDepth[mapIndex + k] = 0;
-                    }
-
-                    int curX = mapX + x - 100;
-                    int curY = mapY + y - 100;
-
-                    if (curX <= 1 || curX >= XRes - 1 ||
-                        curY <= 1 || curY >= YRes - 1)
-                    {
-                        continue;
-                    }
-
-                    int i = curX + curY * srcStride;
-
-                    ushort value = sourceData[i];
-
-                    //Threshold the depth 
-                    if (value > 400 &&
-                        value > targetDepth - 100 &&
-                        value < targetDepth + 100)
-                    {
-                        //Keep the depth visual
-                        //filteredData[i] = value;
-                        //fastBitmap.SetPixel(curX, curY, value);
-                        //gradientData[i] = 0;
-                        //fastGradient.SetPixel(curX, curY, 0);
-                        //fastGradient.Bitmap[i] = 0;
-                        for (int m = 0; m < 3; m++)
-                        {
-                            handMapDepthVals[mapIndexVals] = value;
-                        }
-                        handMapDepth[mapIndex + 3] = 255;
-                        handMap[mapIndex + 0] = 255;
-                        handMap[mapIndex + 3] = 255;
-                        /*
-                        //Do edge detection
-                        int threshold = 40;
-                        if ((value - sourceData[i + rightOffset]) > threshold ||
-                            (value - sourceData[i + leftOffset]) > threshold ||
-                            (value - sourceData[i + upOffset]) > threshold ||
-                            (value - sourceData[i + downOffset]) > threshold ||
-                            (value - sourceData[i + rightDownOffset]) > threshold ||
-                            (value - sourceData[i + rightUpOffset]) > threshold ||
-                            (value - sourceData[i + leftDownOffset]) > threshold ||
-                            (value - sourceData[i + leftUpOffset]) > threshold ||
-
-                            (value - sourceData[i + rightOffset]) < -threshold ||
-                            (value - sourceData[i + leftOffset]) < -threshold ||
-                            (value - sourceData[i + upOffset]) < -threshold ||
-                            (value - sourceData[i + downOffset]) < -threshold ||
-                            (value - sourceData[i + rightDownOffset]) < -threshold ||
-                            (value - sourceData[i + rightUpOffset]) < -threshold ||
-                            (value - sourceData[i + leftDownOffset]) < -threshold ||
-                            (value - sourceData[i + leftUpOffset]) < -threshold)
-                        {
-                            //gradientData[i] = 1;
-                            //fastGradient.SetPixel(curX, curY, 1);
-                            //fastGradient.Bitmap[i] = 1;
-                            hand.PolarPoints.AddPoint(new Point2D(curX, curY));
-
-                            handMap[mapIndex + 0] = 255;
-                            handMap[mapIndex + 3] = 255;
-
-                            avgX += curX;
-                            avgY += curY;
-                            avgCount++;
-                        }
-                         */
-            /*
-                        avgX += curX;
-                        avgY += curY;
-                        avgCount++;
-                    }
-                }
-            }
-            if (avgCount == 0)
-                continue;
-            avgX /= avgCount;
-            avgY /= avgCount;
-
-            hand.PolarPoints.UpdateCenter(new Point2D(avgX, avgY));
-
-            CalcHist(hand.XRes, hand.YRes, handMapDepthVals);
-            int j = 0;
-            int interval = hand.BytesPerPixel;
-            int limit = hand.HandMapSize;
-            for (int i = 0; i < limit; i += interval, j++)
-            {
-                handMapDepth[i] = (byte)histogram[handMapDepthVals[j]];
-                handMapDepth[i + 1] = (byte)histogram[handMapDepthVals[j]];
-                handMapDepth[i + 2] = (byte)histogram[handMapDepthVals[j]];
-            }
-            */
-            /*
-                }
-            }
-            
-
-            if (DepthUpdated != null)
-            {
-                //ushort* pLabels = (ushort*)this.userGenerator.GetUserPixels(0).SceneMapPtr.ToPointer();
-                CalcHist(XRes, YRes, filteredData);
-
-                int j = 0;
-
-                byte[] fullmap = new byte[size];
-                for (int i = 0; i < size; i += 3, j++)
-                {
-                    //ushort label = pLabels[j];
-                    //Color labelColor = Colors.White;
-                    //if (label != 0)
-                    //{
-                    //    labelColor = colors[label % ncolors];
-                    //}
-
-                    //fullmap[i] = (byte)(histogram[filteredData[j]] * (labelColor.R / 256.0));
-                    //fullmap[i + 1] = (byte)(histogram[filteredData[j]] * (labelColor.G / 256.0));
-                    //fullmap[i + 2] = (byte)(histogram[filteredData[j]] * (labelColor.B / 256.0)); 
-                    fullmap[i] = (byte)(histogram[filteredData[j]]);
-                    fullmap[i + 1] = (byte)(histogram[filteredData[j]]);
-                    fullmap[i + 2] = (byte)(histogram[filteredData[j]]);
-                }
-
-                //foreach (uint user in users)
-                //{
-                //    if (this.skeletonCapability.IsTracking(user))
-                //        DrawSkeleton(fullmap, anticolors[user % ncolors], user);
-                //}
-                OnDepthUpdated(fullmap, XRes, YRes, rgbStride, PixelFormats.Rgb24);
-            }
-            //PolarCoord co = new PolarCoord(new Point2D(20, 20));
-            //co.CalculateCenter(new Point2D(0, 0), new Vector(0, 1));
-            //co.UpdatePosition(new Point2D(0, 0));
-
-            if (DataMapUpdated == null)
-                return;
-
-
-            foreach (var kvp in sessions)
-            {
-                var hand = kvp.Value;
-
-                foreach (var coord in hand.PolarPoints.Points)
-                {
-                    int index = BitmapHelper.CoordinateToIndex(coord.Position.X, coord.Position.Y, 3, rgbStride);
-                    map[index] = 0;
-                    map[index + 1] = 0;
-                    map[index + 2] = 255;
-                }
-
-                hand.Circles.Clear();
-                hand.Bins.Clear();
-
-                //Find the wrist gap
-                //int currentGapCount = 0;
-                //int currentGapStart = -1;
-                //int maxGapCount = 0;
-                //int angleOffset = 0;
-                //int gapThreshold = 10;
-                //bool previousWasGap = false;
-                //for (int i = 0; i < 360; i++)
-                //{
-                //    var coords = hand.PolarPoints.GetCoordsByAngle(i);
-                //    if (coords.Count() == 0)
-                //    {
-                //        currentGapCount++;
-                //        if (!previousWasGap)
-                //        {
-                //            currentGapStart = i;
-                //        }
-                //        if (currentGapCount > maxGapCount)
-                //        {
-                //            maxGapCount = currentGapCount;
-                //            angleOffset = currentGapStart;
-                //        }
-                //    }
-                //    else
-                //    {
-                //        currentGapCount = 0;
-
-                //        previousWasGap = false;
-                //    }
-                //}
-
-                //if (angleOffset < gapThreshold)
-                //{
-                //    angleOffset = 0;
-                //}
-                //else
-                //{
-                //    for (int i = angleOffset - 40 - maxGapCount; i < angleOffset + 40; i++)
-                //    {
-                //        int index = (int)MathUtility.NormalizeAngle(i);
-                //        var coords = hand.PolarPoints.GetCoordsByAngle(index);
-                //        if (coords.Count() == 0)
-                //        {
-                //            continue;
-                //        }
-                //        else
-                //        {
-                //            coords.ToList().ForEach(c =>
-                //                {
-                //                    c.Radius = 30;
-                //                    //c.UpdatePosition(hand.PolarPoints.Center);
-                //                });
-                //        }
-                //    }
-                //}
-
-                {
-                    //smooth the lines
-                    //double minRadius = double.MaxValue;
-                    //double avgRadius = 0;
-                    //double avgCount = 0;
-                    //double squareSum = 0;
-
-                    for (int i = 0; i < 360; i++)
-                    {
-                        var coords = hand.PolarPoints.GetCoordsByAngle(i);
-                        if (coords.Count() == 0)
-                        {
-                            continue;
-                        }
-
-                        double value = 0;
-                        int count = 0;
-
-                        for (int k = -15; k <= 15; k++)
-                        {
-                            int index = (int)MathUtility.NormalizeAngle(i + k);
-                            var coordsLoop = hand.PolarPoints.GetCoordsByAngle(index);
-                            if (coordsLoop.Count() != 0)
-                            {
-                                value += coordsLoop.ToList().Max(c => c.Radius);
-                                count++;
-                            }
-                        }
-
-
-                        if (count == 0)
-                        {
-                            count = 1;
-                            value = 0;
-                        }
-                        value /= count;
-
-                        coords.ToList().ForEach(c =>
-                        {
-                            c.Radius = value;
-                        });
-
-                        //squareSum += value * value;
-                        //if (value < minRadius)
-                        //    minRadius = value;
-                        //avgRadius += value;
-                        //avgCount++;
-                    }
-                    hand.PolarPoints.UpdateCenter(hand.PolarPoints.Center);
-
-                    //squareSum /= avgCount;
-                    //avgRadius /= avgCount;
-                    //double stddev = Math.Sqrt(squareSum - avgRadius * avgRadius);
-
-                    //hand.Circles.Add(new PolarCoord()
-                    //{
-                    //    Radius = minRadius + stddev,
-                    //    Position = hand.PolarPoints.Center
-                    //});
-                    hand.Circles.Add(new PolarCoord()
-                    {
-                        Radius = hand.PolarPoints.MinRadius,
-                        Position = hand.PolarPoints.Center
-                    });
-
-                    //PolarCoordCollection bin = new PolarCoordCollection();
-                    //bin.UpdateCenter(hand.PolarPoints.Center);
-                    //hand.Bins.Add(bin);
-                    //for (int i = 0; i < 360; i++)
-                    //{
-                    //    var coords = hand.PolarPoints.GetCoordsByAngle(i);
-                    //    if (coords.Count() == 0)
-                    //        continue;
-                    //    foreach (var coord in coords)
-                    //    {
-                    //        if (coord.Radius < minRadius + stddev)
-                    //        {
-                    //            bin.AddPoint(coord);
-                    //            coord.Radius = minRadius;
-                    //            coord.IsClassified = true;
-                    //        }
-                    //    }
-                    //}
-                }
-                //Segment sub-bins
-                //List<PolarCoordCollection> bins = new List<PolarCoordCollection>();
-                //PolarCoordCollection currentBin = new PolarCoordCollection();
-                //bins.Add(currentBin);
-                //bool wasLastEmpty = false;
-                //for (int i = 0; i < 360; i++)
-                //{
-                //    var coords = hand.PolarPoints.GetCoordsByAngle(i);
-                //    if (coords.Count() == 0)
-                //    {
-                //        continue;
-                //    }
-                //    if (coords.FirstOrDefault(c => c.IsClassified) != null)
-                //    {
-                //        if (!wasLastEmpty)
-                //        {
-                //            currentBin = new PolarCoordCollection();
-                //            bins.Add(currentBin);
-                //        }
-                //        wasLastEmpty = true;
-                //        continue;
-                //    }
-                //    wasLastEmpty = false;
-                //    coords.ToList().ForEach(c => currentBin.AddPoint(c.Position));
-                //    //coords.ToList().ForEach(currentBin.AddPoint);
-                //}
-
-                //foreach (var collection in bins)
-                //{
-                //    hand.Bins.Add(collection);
-                //    int avgX = 0;
-                //    int avgY = 0;
-                //    int avgCount = 0;
-                //    collection.Points.ToList().ForEach(c =>
-                //        {
-                //            avgX += c.Position.X;
-                //            avgY += c.Position.Y;
-                //            avgCount++;
-                //        });
-                //    if (avgCount == 0)
-                //        continue;
-
-                //    avgX /= avgCount;
-                //    avgY /= avgCount;
-
-                //    collection.UpdateCenter(new Point2D(avgX, avgY));
-
-                //    double minRadius = collection.Points.ToList().Min(c => c.Radius);
-                //    hand.Circles.Add(new PolarCoord()
-                //    {
-                //        Radius = minRadius,
-                //        Position = collection.Center
-                //    });
-
-                //    foreach (var coord in collection.Points)
-                //    {
-                //        if (coord.Radius < minRadius + 20)
-                //        {
-                //            coord.Radius = minRadius;
-                //            coord.IsClassified = true;
-                //        }
-                //    }
-                //}
-            */
-
-            //Display everything
-            /*
-            Point position = new Point(10, 470);
-            xn.Point3D projective = depthGenerator.ConvertRealWorldToProjective(hand.Position);
-            Point reCenter = new Point(projective.X + 150, projective.Y);
-            position = new Point(projective.X - 90, projective.Y + 200);
-            for (int i = 0; i < 360; i += 1)
-            {
-                int normAngle = (int)MathUtility.NormalizeAngle(i + angleOffset - maxGapCount + 1);
-                var coords = hand.PolarPoints.GetCoordsByAngle(normAngle);
-
-                if (coords.Count() == 0)
-                {
-                    continue;
-                }
-
-                int yStart = (int)position.Y;
-                double radius = coords.ToList().Max(c => c.Radius);
-
-                for (int y = yStart; y > yStart - radius; y--)
-                {
-                    if (position.X > 0 &&
-                        position.X < depthMD.XRes &&
-                        y > 0 &&
-                        y < depthMD.YRes)
-                    {
-                        int index = (int)position.X * 3 + y * rgbStride;
-                        map[index] = 0;
-                        map[index + 1] = 255;
-                        map[index + 2] = 0;
-                    }
-                }
-                position.X += 1;
-            }
-
-            foreach (var bin in hand.Bins)
-            {
-                foreach (var coord in bin.Points)
-                {
-                    int x2 = (int)(bin.Center.X + 150 + Math.Cos((coord.Angle + 90) * Math.PI / 180.0) * coord.Radius);
-                    int y2 = (int)(bin.Center.Y + Math.Sin((coord.Angle + 90) * Math.PI / 180.0) * coord.Radius);
-                    if (x2 > 0 &&
-                        x2 < depthMD.XRes &&
-                        y2 > 0 &&
-                        y2 < depthMD.YRes)
-                    {
-                        int index2 = (int)x2 * 3 + y2 * rgbStride;
-
-                        map[index2] = 255;
-                        map[index2 + 1] = 255;
-                        map[index2 + 2] = 255;
-                    }
-                }
-
-            }
-            */
-            /*
-                foreach (var circle in hand.Circles)
-                {
-                    for (int m = 0; m < 360; m++)
-                    {
-                        int x2 = (int)(circle.Position.X + Math.Cos(m * Math.PI / 180.0) * circle.Radius);
-                        int y2 = (int)(circle.Position.Y + Math.Sin(m * Math.PI / 180.0) * circle.Radius);
-                        if (x2 > 0 &&
-                            x2 < depthMD.XRes &&
-                            y2 > 0 &&
-                            y2 < depthMD.YRes)
-                        {
-                            int index2 = (int)x2 * 3 + y2 * rgbStride;
-
-                            map[index2] = 255;
-                            map[index2 + 1] = 255;
-                            map[index2 + 2] = 255;
-                        }
-                    }
-                }
-            }
-            OnDataMapUpdated(map, XRes, YRes, rgbStride, PixelFormats.Rgb24);
-            */
-        }
-
-        unsafe private static void CopyImageData(int numPixels, ushort* sourceData, Image sourceImage)
-        {
-
-            var imageData = sourceImage.Lock(DirectCanvas.Imaging.ImageLock.ReadWrite);
-
-            //Image is BGRA format, 4 bytes per pixel
-            byte* imagePtr = (byte*)imageData.Scan0.ToPointer();
-
-            for (int i = 0; i < numPixels; i++, sourceData++, imagePtr += 4)
-            {
-                //ushort value = sourceData[i];
-
-                //pack ushort into first two bytes of pixel
-                //((ushort*)imagePtr)[i * 2] = value;
-                *(ushort*)imagePtr = *sourceData;
-                //imagePtr[i * 4] = (byte)(value & 255); //low byte in B
-                //imagePtr[i * 4 + 1] = (byte)(value >> 8); //high byte in G
-
-                //store 255 in Alpha channel of pixel
-                //imagePtr[i * 4 + 3] = 255;
-                *(imagePtr + 3) = 255;
-            }
-
-            sourceImage.Unlock(imageData);
-        }
-
-        unsafe private void UpdateSessions()
-        {
-            uint[] users = this.userGenerator.GetUsers();
-            foreach (uint user in users)
+            int[] users = this.userGenerator.GetUsers();
+            foreach (int user in users)
             {
                 if (this.skeletonCapability.IsTracking(user))
                 {
@@ -1092,12 +564,11 @@ namespace InfoStrat.MotionFx
                         continue;
                     Dictionary<SkeletonJoint, SkeletonJointPosition> dict = this.joints[user];
 
-
-                    if (dict[SkeletonJoint.LeftShoulder].fConfidence > 0.5 &&
-                        dict[SkeletonJoint.LeftHand].fConfidence > 0.5)
+                    if (dict[SkeletonJoint.LeftShoulder].Confidence > 0.5 &&
+                        dict[SkeletonJoint.LeftHand].Confidence > 0.5)
                     {
-                        xn.Point3D leftShoulder = dict[SkeletonJoint.LeftShoulder].position;
-                        xn.Point3D leftHand = dict[SkeletonJoint.LeftHand].position;
+                        OpenNI.Point3D leftShoulder = dict[SkeletonJoint.LeftShoulder].Position;
+                        OpenNI.Point3D leftHand = dict[SkeletonJoint.LeftHand].Position;
 
                         UpdateHandSession((int)user * 2, leftHand, leftShoulder);
                     }
@@ -1106,11 +577,11 @@ namespace InfoStrat.MotionFx
                         DestroyHandSession((int)user * 2);
                     }
 
-                    if (dict[SkeletonJoint.RightShoulder].fConfidence > 0.5 &&
-                        dict[SkeletonJoint.RightHand].fConfidence > 0.5)
+                    if (dict[SkeletonJoint.RightShoulder].Confidence > 0.5 &&
+                        dict[SkeletonJoint.RightHand].Confidence > 0.5)
                     {
-                        xn.Point3D rightShoulder = dict[SkeletonJoint.RightShoulder].position;
-                        xn.Point3D rightHand = dict[SkeletonJoint.RightHand].position;
+                        OpenNI.Point3D rightShoulder = dict[SkeletonJoint.RightShoulder].Position;
+                        OpenNI.Point3D rightHand = dict[SkeletonJoint.RightHand].Position;
                         UpdateHandSession((int)user * 2 + 1, rightHand, rightShoulder);
                     }
                     else
@@ -1121,231 +592,9 @@ namespace InfoStrat.MotionFx
             }
         }
 
-        unsafe private static void ProcessRect(DepthMetaData depthMD, int srcStride, ushort[] filteredData, ushort[] gradientData, HandSession hand, int x, int y)
-        {
-            int sizeRight = 99;
-            int sizeLeft = 99;
-            int sizeUp = 99;
-            int sizeDown = 99;
-            //Find the largest rectangle that fits
-            for (int i = 0; i < 100; i++)
-            {
-                if (sizeRight == 99 &&
-                    x + i > 2 &&
-                    x + i < depthMD.XRes - 2)
-                {
-                    if (filteredData[(x + i) + y * srcStride] > 400)
-                    {
-                        gradientData[(x + i) + y * srcStride] = 2;
-                    }
-                    else
-                    {
-                        sizeRight = i;
-                    }
-                }
-                if (sizeLeft == 99 &&
-                    x - i > 2 &&
-                    x - i < depthMD.XRes - 2)
-                {
-                    if (filteredData[(x - i) + y * srcStride] > 400)
-                    {
-                        gradientData[(x - i) + y * srcStride] = 2;
-                    }
-                    else
-                    {
-                        sizeLeft = i;
-                    }
-                }
+        #region Hand HandSessions
 
-                if (sizeDown == 99 &&
-                    y + i > 2 &&
-                    y + i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x + (y + i) * srcStride] > 400)
-                    {
-                        gradientData[x + (y + i) * srcStride] = 2;
-                    }
-                    else
-                    {
-                        sizeDown = i;
-                    }
-                }
-                if (sizeUp == 99 &&
-                    y - i > 2 &&
-                    y - i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x + (y - i) * srcStride] > 400)
-                    {
-                        gradientData[x + (y - i) * srcStride] = 2;
-                    }
-                    else
-                    {
-                        sizeUp = i;
-                    }
-                }
-            }
-
-            int rightDown = 99;
-            int rightUp = 99;
-            int leftDown = 99;
-            int leftUp = 99;
-
-            int sizeRightA = (int)(sizeRight * 0.75);
-            int sizeLeftA = (int)(sizeLeft * 0.75);
-
-            for (int i = 0; i < 100; i++)
-            {
-                if (rightDown == 99 &&
-                    y + i > 2 &&
-                    y + i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x + sizeRightA + (y + i) * srcStride] > 400)
-                    {
-                        gradientData[x + sizeRightA + (y + i) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        rightDown = i;
-                    }
-                }
-
-                if (rightUp == 99 &&
-                    y - i > 2 &&
-                    y - i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x + sizeRightA + (y - i) * srcStride] > 400)
-                    {
-                        gradientData[x + sizeRightA + (y - i) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        rightUp = i;
-                    }
-                }
-
-                if (leftDown == 99 &&
-                    y + i > 2 &&
-                    y + i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x - sizeLeftA + (y + i) * srcStride] > 400)
-                    {
-                        gradientData[x - sizeLeftA + (y + i) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        leftDown = i;
-                    }
-                }
-
-                if (leftUp == 99 &&
-                    y - i > 2 &&
-                    y - i < depthMD.YRes - 2)
-                {
-                    if (filteredData[x - sizeLeftA + (y - i) * srcStride] > 400)
-                    {
-                        gradientData[x - sizeLeftA + (y - i) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        leftUp = i;
-                    }
-                }
-            }
-            int sizeUpA = Math.Min(leftUp, rightUp);
-            int sizeDownA = Math.Min(leftDown, rightDown);
-
-            int rightDown2 = 99;
-            int rightUp2 = 99;
-            int leftDown2 = 99;
-            int leftUp2 = 99;
-
-            int sizeDownB = (int)(sizeDown * 0.75);
-            int sizeUpB = (int)(sizeUp * 0.75);
-
-            for (int i = 0; i < 100; i++)
-            {
-                if (rightDown2 == 99 &&
-                    x + i > 2 &&
-                    x + i < depthMD.XRes - 2)
-                {
-                    if (filteredData[x + i + (y + sizeDownB) * srcStride] > 400)
-                    {
-                        gradientData[x + i + (y + sizeDownB) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        rightDown2 = i;
-                    }
-                }
-
-                if (rightUp2 == 99 &&
-                    x + i > 2 &&
-                    x + i < depthMD.XRes - 2)
-                {
-                    if (filteredData[x + i + (y - sizeUpB) * srcStride] > 400)
-                    {
-                        gradientData[x + i + (y - sizeUpB) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        rightUp2 = i;
-                    }
-                }
-
-                if (leftDown2 == 99 &&
-                    x - i > 2 &&
-                    x - i < depthMD.XRes - 2)
-                {
-                    if (filteredData[x - i + (y + sizeDownB) * srcStride] > 400)
-                    {
-                        gradientData[x - i + (y + sizeDownB) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        leftDown2 = i;
-                    }
-                }
-
-                if (leftUp2 == 99 &&
-                    x - i > 2 &&
-                    x - i < depthMD.XRes - 2)
-                {
-                    if (filteredData[x - i + (y - sizeUpB) * srcStride] > 400)
-                    {
-                        gradientData[x - i + (y - sizeUpB) * srcStride] = 3;
-                    }
-                    else
-                    {
-                        leftUp2 = i;
-                    }
-                }
-            }
-            int sizeRightB = Math.Min(rightUp, rightDown);
-            int sizeLeftB = Math.Min(leftUp, leftDown);
-
-            if ((sizeRightA + sizeLeftA) * (sizeUpA + sizeUpA) >
-                (sizeRightB + sizeLeftB) * (sizeUpB + sizeUpB))
-            {
-                sizeRight = sizeRightA;
-                sizeLeft = sizeLeftA;
-                sizeUp = sizeUpA;
-                sizeDown = sizeDownA;
-            }
-            else
-            {
-                sizeRight = sizeRightB;
-                sizeLeft = sizeLeftB;
-                sizeUp = sizeUpB;
-                sizeDown = sizeDownB;
-            }
-
-            Size handSize = new Size(sizeRight + sizeLeft, sizeUp + sizeDown);
-            hand.Rect = new Rect(new Point(x - sizeLeft, y - sizeUp), handSize);
-        }
-
-        #region Hand Sessions
-
-        private void UpdateHandSession(int id, xn.Point3D position, xn.Point3D shoulderPosition)
+        private void UpdateHandSession(int id, OpenNI.Point3D position, OpenNI.Point3D shoulderPosition)
         {
             lock (HandSessions)
             {
@@ -1360,7 +609,7 @@ namespace InfoStrat.MotionFx
                 HandSessions[id].xnPosition = position;
                 HandSessions[id].Position = MotionHelper.XnPoint3DToPoint3D(position);
                 HandSessions[id].ShoulderPosition = MotionHelper.XnPoint3DToPoint3D(shoulderPosition);
-                xn.Point3D projective = depthGenerator.ConvertRealWorldToProjective(position);
+                OpenNI.Point3D projective = depthGenerator.ConvertRealWorldToProjective(position);
                 HandSessions[id].PositionProjective = MotionHelper.XnPoint3DToPoint3D(projective);
                 OnPointUpdated(id, HandSessions[id]);
 

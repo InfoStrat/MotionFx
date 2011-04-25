@@ -52,15 +52,15 @@ bool IsCoordInThreshold(float2 coord)
 	return false;
 }
 
-// Performs a gaussian blur in one direction
 float4 ApplyThreshold(in PSInput input)
 {
     float2 texCoord = input.TexCoord;
 	float4 color = float4(0, 0, 0, 0);
-	//float4 sample = InputTexture.Sample(TextureSampler, texCoord);
+	float4 sample = InputTexture.Sample(TextureSampler, texCoord);
 	if (IsCoordInThreshold(texCoord))
 	{
 		color = tint;
+	//	color = sample;
 	}
 	
     return color;
