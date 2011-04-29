@@ -350,14 +350,19 @@ namespace InfoStrat.MotionFx
 
             try
             {
+#if DEBUG
                 CountFrames();
+#endif
                 if (ProcessDepthImage)
                 {
                     var frame = e.Frame;
-
+                    
                     sourceImage = e.Frame.ToDirectCanvasImage(imageProcessor.Factory);
                 }
-                imageProcessor.ProcessDepthSessions(sourceImage, deviceDictionary);
+
+                ushort max = e.Frame.DepthPixels.AsParallel().Max();
+                ushort min = e.Frame.DepthPixels.AsParallel()   .Where(v => v > 100).Min();
+                imageProcessor.ProcessDepthSessions(sourceImage, deviceDictionary, max, min);
 
                 OnFrameUpdated(e);
             }

@@ -42,6 +42,8 @@ namespace InfoStrat.MotionFx.ImageProcessing.Effects
             RegisterProperty<float>(MAX_VALUE);
             RegisterProperty<float>(TEXSIZEX_VALUE);
             RegisterProperty<float>(TEXSIZEY_VALUE);
+
+            this.Filter = ShaderEffectFilter.Point;
         }
 
         private static string GetResourceString(string embeddedResourceName, Assembly assembly)

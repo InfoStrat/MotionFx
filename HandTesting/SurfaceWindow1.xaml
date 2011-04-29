@@ -60,6 +60,11 @@
     </s:SurfaceWindow.Resources>
 
     <Grid Background="White">
+        <!--<Grid Background="Black">
+            <mc:DepthFrameViewer Factory="{Binding Factory}"
+                                 DepthFrame="{Binding Frame}"
+                                 LoadThresholdFromDepthFrame="False" />
+        </Grid>-->
         <Grid>
             <blake:InputFilter.Filter>
                 <filters:PushMotionInputFilter />
@@ -172,6 +177,7 @@
         <mc:DepthView HorizontalAlignment="Left"
                       VerticalAlignment="Top"
                       IsHitTestVisible="False"
+                      Opacity=".3"
                       MotionTrackingClient="{Binding MotionTrackingClient}"/>
         <mc:HandVisualization IsHitTestVisible="False"
                               MotionTrackingClient="{Binding MotionTrackingClient}" />

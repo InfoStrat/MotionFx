@@ -527,6 +527,7 @@ namespace InfoStrat.MotionFx
                     pixels = new ushort[numPixels];
                 }
 
+                //Marshal.Copy(depthMD.DepthMapPtr, (byte[])pixels, 0, numPixels);
                 fixed (ushort* dest = pixels)
                 {
                     NativeInterop.MoveMemory((IntPtr)dest, depthMD.DepthMapPtr, numPixels * sizeof(ushort));

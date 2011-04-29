@@ -8,7 +8,7 @@ using Blake.NUI.WPF.Utility;
 
 namespace InfoStrat.MotionFx
 {
-    internal static class MotionTracking
+    public static class MotionTracking
     {
         #region RoutedEvents
 

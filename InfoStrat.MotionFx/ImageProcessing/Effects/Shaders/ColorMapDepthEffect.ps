@@ -57,7 +57,7 @@ float4 Convert(in PSInput input)
 	}
 	float minV = max(MinThreshold, MinValue);
 	float maxV = min(MaxThreshold, MaxValue);
-	float newValue = 1 - (value - minV) / (maxV - minV);
+	float newValue = 1 - ((value - minV) / (maxV - minV));
 	return float4(newValue, newValue, newValue, sample.a);
 }
 

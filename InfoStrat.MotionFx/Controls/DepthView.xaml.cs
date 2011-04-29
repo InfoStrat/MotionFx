@@ -147,7 +147,7 @@ namespace InfoStrat.MotionFx.Controls
             {
                 this.txtStatus.Text = "Skeleton: " + e.Id;
                 borderUser.Background = Brushes.Green;
-                AnimateUtility.AnimateElementDouble(borderUser, OpacityProperty, 0.5, 0.0, 2.0);
+                //AnimateUtility.AnimateElementDouble(borderUser, OpacityProperty, 0.5, 0.0, 2.0);
             });
         }
     }

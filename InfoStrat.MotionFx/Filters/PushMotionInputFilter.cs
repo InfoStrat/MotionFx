@@ -74,7 +74,7 @@ namespace InfoStrat.MotionFx.Filters
 
             Vector3D vector = motionDevice.Session.Position - motionDevice.Session.ShoulderPosition;
 
-            if (vector.Length > MinimumDistance)
+            if (Math.Abs(vector.Z) > MinimumDistance)
                 return NotifyTransition(wasValid, motionDevice, true);
 
             return NotifyTransition(wasValid, motionDevice, false);

@@ -37,6 +37,8 @@ namespace InfoStrat.MotionFx.ImageProcessing.Effects
             RegisterProperty<float>(MAXTHRESHOLD_VALUE);
             RegisterProperty<float>(MIN_VALUE);
             RegisterProperty<float>(MAX_VALUE);
+
+            Filter = ShaderEffectFilter.Point;
         }
 
         private static string GetResourceString(string embeddedResourceName, Assembly assembly)

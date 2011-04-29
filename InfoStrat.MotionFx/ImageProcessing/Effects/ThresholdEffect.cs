@@ -31,7 +31,7 @@ namespace InfoStrat.MotionFx.ImageProcessing.Effects
             RegisterProperty<Color4>(TINTCOLOR_REGISTER);
             RegisterProperty<float>(MINTHRESHOLD_VALUE);
             RegisterProperty<float>(MAXTHRESHOLD_VALUE);
-
+            Filter = ShaderEffectFilter.Point;
         }
 
         private static string GetResourceString(string embeddedResourceName, Assembly assembly)

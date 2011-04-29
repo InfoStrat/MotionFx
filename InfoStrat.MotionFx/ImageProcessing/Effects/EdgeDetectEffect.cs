@@ -40,6 +40,7 @@ namespace InfoStrat.MotionFx.ImageProcessing.Effects
             RegisterProperty<float>(TEXSIZEY_VALUE);
             RegisterProperty<float>(EDGETHRESHOLDSQ_VALUE);
 
+            Filter = ShaderEffectFilter.Point;
         }
 
         private static string GetResourceString(string embeddedResourceName, Assembly assembly)

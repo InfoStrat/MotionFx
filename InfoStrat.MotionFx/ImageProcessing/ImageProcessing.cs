@@ -100,18 +100,19 @@ namespace InfoStrat.MotionFx.ImageProcessing
             }
         }
 
-        public void ProcessDepthSessions(Image depthImage, Dictionary<int, MotionTrackingDevice> devices)
+        public void ProcessDepthSessions(Image depthImage, Dictionary<int, MotionTrackingDevice> devices, ushort max, ushort min)
         {
             if (depthImage != null)
             {
                 intermediateLayer.CopyFromImage(depthImage);
 
-                unpackEffect.TexSize = new DirectCanvas.Misc.Size(rawDepthLayer.Width/2, rawDepthLayer.Height);
+                unpackEffect.TexSize = new DirectCanvas.Misc.Size(rawDepthLayer.Width, rawDepthLayer.Height);
                 intermediateLayer.ApplyEffect(unpackEffect, rawDepthLayer, true);
 
                 colorMapEffect.MinThreshold = 100f;
                 colorMapEffect.MaxThreshold = 10000f;
-                colorMapEffect.MaxValue = 2500f;
+                colorMapEffect.MinValue = min;
+                colorMapEffect.MaxValue = max;
                 rawDepthLayer.ApplyEffect(colorMapEffect, DepthPresenter, true);
 
                 //edgeEffect.Tint = new Color4(1, 1, 0, 0);

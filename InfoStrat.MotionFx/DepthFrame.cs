@@ -9,6 +9,7 @@ using DirectCanvas.Imaging;
 using DirectCanvas;
 using System.Windows.Media.Imaging;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace InfoStrat.MotionFx
 {
@@ -193,6 +194,8 @@ namespace InfoStrat.MotionFx
 
         unsafe public Image ToDirectCanvasImage(DirectCanvasFactory factory)
         {
+            //ushort min, max;
+            //return ToDirectCanvasImage(factory, out min, out max);
             Image sourceImage = factory.CreateImage(_width, _height);
             var imageData = sourceImage.Lock(DirectCanvas.Imaging.ImageLock.ReadWrite);
             int numPixels = _width * _height;
@@ -211,7 +214,6 @@ namespace InfoStrat.MotionFx
             {
                 NativeInterop.MoveMemory(imageData.Scan0, (IntPtr)sourceDataPtr, len);
             }
-
             sourceImage.Unlock(imageData);
 
             return sourceImage;
@@ -255,18 +257,18 @@ namespace InfoStrat.MotionFx
 
                         //store 255 in Alpha channel of pixel
                         //imagePtr[i * 4 + 3] = 255;
-                        if (_crop.Contains(x, y))
-                        {
-                            *(imagePtr + 3) = 255;
-                        }
-                        else
-                        {
-                            *(imagePtr + 3) = 128;
-                        }
+                        //if (_crop.Contains(x, y))
+                        //{
+                        //    *(imagePtr + 3) = 255;
+                        //}
+                        //else
+                        //{
+                        //    *(imagePtr + 3) = 128;
+                        //}
 
                         sourcePtr++;
                         imagePtr += 4;
-                        targetPtr += 2;
+                        targetPtr += 1;
                     }
                 }
             }

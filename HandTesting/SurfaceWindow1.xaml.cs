@@ -9,6 +9,7 @@ using Blake.NUI.WPF.Utility;
 using Blake.NUI.WPF.SurfaceToolkit.Utility;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using DirectCanvas;
 
 namespace HandTesting
 {
@@ -75,6 +76,78 @@ namespace HandTesting
 
         #endregion
 
+        #region Factory
+
+        /// <summary>
+        /// The <see cref="Factory" /> property's name.
+        /// </summary>
+        public const string FactoryPropertyName = "Factory";
+
+        private DirectCanvasFactory _factory = null;
+
+        /// <summary>
+        /// Gets the Factory property.
+        /// </summary>
+        public DirectCanvasFactory Factory
+        {
+            get
+            {
+                return _factory;
+            }
+
+            set
+            {
+                if (_factory == value)
+                {
+                    return;
+                }
+
+                var oldValue = _factory;
+                _factory = value;
+
+                // Update bindings, no broadcast
+                RaisePropertyChanged(FactoryPropertyName);
+            }
+        }
+
+        #endregion
+
+        #region Frame
+
+        /// <summary>
+        /// The <see cref="Frame" /> property's name.
+        /// </summary>
+        public const string FramePropertyName = "Frame";
+
+        private DepthFrame _frame = null;
+
+        /// <summary>
+        /// Gets the Frame property.
+        /// </summary>
+        public DepthFrame Frame
+        {
+            get
+            {
+                return _frame;
+            }
+
+            set
+            {
+                if (_frame == value)
+                {
+                    return;
+                }
+
+                var oldValue = _frame;
+                _frame = value;
+
+                // Update bindings, no broadcast
+                RaisePropertyChanged(FramePropertyName);
+            }
+        }
+
+        #endregion
+
         #endregion
 
         public SurfaceWindow1()
@@ -100,11 +173,17 @@ namespace HandTesting
             this.Loaded += new RoutedEventHandler(SurfaceWindow1_Loaded);
 
             MotionTrackingClient = new MotionTrackingClient(this);
-            
+            MotionTrackingClient.FrameUpdated += new EventHandler<FrameUpdatedEventArgs>(MotionTrackingClient_FrameUpdated);
             NativeTouchDevice.RegisterEvents(this);
 
             InitData();
             this.DataContext = this;
+        }
+
+        void MotionTrackingClient_FrameUpdated(object sender, FrameUpdatedEventArgs e)
+        {
+            Frame = e.Frame;
+            Factory = _motionTrackingClient.Factory;
         }
 
         private void InitData()

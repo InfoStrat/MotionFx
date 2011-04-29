@@ -56,6 +56,7 @@ float Unpack(float4 value)
 
 float4 GetSample(float2 input)
 {
+return InputTexture.Sample(TextureSampler, input);
     int index = TexSizeX * (0.5 + input.x + input.y * TexSizeY);
     bool alternatePositionFlag = fmod(index, 2) != 0;
 
@@ -71,17 +72,42 @@ float4 GetSample(float2 input)
     else
         sample = float4(0, sample.g, sample.b, 1);
 
-    float value = Unpack(sample);
-    if (value < 100)
-    {
-        sample = float4(0, 1, 1, 1);
-    }
+//    float value = Unpack(sample);
+//    if (value < 100)
+//    {
+//        sample = float4(0, 0, 0, 1);
+//    }
 
+    return sample;
+}
+
+float4 GetSampleAlt(float2 input)
+{
+    // compute texel array coordinates
+    int target_x = input.x * TexSizeX;
+    int target_y = input.y * TexSizeY;
+    
+    float2 coord = input / 2;
+
+    //Odd numbered rows are in the right side image        
+    if (fmod(target_y, 2) == 1)
+    {
+        coord.x += 0.5;
+    }
+        
+    float4 sample = InputTexture.Sample(TextureSampler, coord);
+
+    //Odd numbered columns are stored in the RA bytes
+    if (fmod(target_x, 2) == 1)
+        sample = float4(0, sample.a, sample.r, 1);
+    else
+        sample = float4(0, sample.g, sample.b, 1);
+    
     return sample;
 }
 
 float4 UnpackDepthMain(in PSInput input) : SV_Target
 {
     float2 texCoord = input.TexCoord;
-    return GetSample(texCoord);
+    return GetSampleAlt(texCoord);
 }

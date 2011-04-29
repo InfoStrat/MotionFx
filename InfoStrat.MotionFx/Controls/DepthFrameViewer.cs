@@ -18,6 +18,7 @@ namespace InfoStrat.MotionFx.Controls
         #region Fields
 
         DrawingLayer effectLayer;
+        DrawingLayer effectLayer2;
         UnpackDepthEffect unpackEffect;
         ColorMapDepthEffect colorMapEffect;
         Brush rectBrushForeground;
@@ -308,6 +309,10 @@ namespace InfoStrat.MotionFx.Controls
             {
                 effectLayer = Factory.CreateDrawingLayer(DepthFrame.Width, DepthFrame.Height);
             }
+            if (effectLayer2 == null)
+            {
+                effectLayer2 = Factory.CreateDrawingLayer(DepthFrame.Width, DepthFrame.Height);
+            }
             if (unpackEffect == null)
             {
                 unpackEffect = new UnpackDepthEffect(Factory);
@@ -344,13 +349,14 @@ namespace InfoStrat.MotionFx.Controls
             Rectangle rect = new Rectangle((int)crop.X, (int)crop.Y, (int)crop.Width, (int)crop.Height);
             RectangleF rectf = new RectangleF((float)crop.X, (float)crop.Y, (float)crop.Width, (float)crop.Height);
 
-            unpackEffect.MinThreshold = (float)MinThreshold;
-            unpackEffect.MaxThreshold = (float)MaxThreshold;
-            unpackEffect.MinValue = minValue;
-            unpackEffect.MaxValue = maxValue;
+            colorMapEffect.MinThreshold = (float)MinThreshold;
+            colorMapEffect.MaxThreshold = (float)MaxThreshold;
+            colorMapEffect.MinValue = minValue;
+            colorMapEffect.MaxValue = maxValue;
             unpackEffect.TexSize = new DirectCanvas.Misc.Size(effectLayer.Width, effectLayer.Height);
-            effectLayer.ApplyEffect(unpackEffect, outputLayer, true);   
-         
+            effectLayer.ApplyEffect(unpackEffect, effectLayer2, true);
+            effectLayer2.ApplyEffect(colorMapEffect, outputLayer, true);
+
             outputLayer.BeginDraw();
             outputLayer.DrawRectangle(rectBrushBackground, rectf, 3f);
             outputLayer.DrawRectangle(rectBrushForeground, rectf, 1f);
